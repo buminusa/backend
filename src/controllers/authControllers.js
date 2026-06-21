@@ -5,7 +5,7 @@ const jwt = require("jsonwebtoken");
 
 
 // register for company
-const register = async (req, res) => {
+const registerCompany = async (req, res) => {
     try {
         const { email, password, company_name, address, province, country, phone, business_description } = req.body;
 
@@ -189,6 +189,6 @@ const login = async (req, res) => {
 
 
 module.exports = {
-    register,
+    registerCompany,
     login
 }
