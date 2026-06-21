@@ -9,6 +9,6 @@ const { uploadRegister } = require("../config/cloudinary");
 // register for company
 router.post("/register", uploadRegister.fields([{ name: "npwp", maxCount: 1 }, { name: "logo", maxCount: 1 }]), handleUploadError, authController.register);
 
-// login for company
-// router.post("/login", authController.login);
+// login
+router.post("/login", authController.login);
 module.exports = router;

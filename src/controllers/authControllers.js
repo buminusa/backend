@@ -134,6 +134,61 @@ const register = async (req, res) => {
     }
 }
 
+// login 
+
+const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // cek email
+        const user = await prisma.users.findUnique({
+            where: {
+                email: email
+            }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid email or password"
+            });
+        }
+
+        // cek password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid email or password"
+            });
+        }
+
+        // generate token
+        const token = jwt.sign(
+            { userId: user.id, email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Login successful",
+            token: token
+        });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
+
 module.exports = {
-    register
+    register,
+    login
 }
