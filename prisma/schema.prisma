@@ -1,10 +1,23 @@
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum VerificationStatus {
+  Pending
+  Verified
+  Rejected
+}
+
+enum ProductStatus {
+  Draft
+  Pending
+  Active
+  Rejected
 }
 
 model Role {
@@ -20,14 +33,13 @@ model Role {
 
 model Users {
   id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(255)
   email     String   @unique @db.VarChar(255)
   password  String   @db.VarChar(255)
   roleId    Int?     @map("role_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  role            Role?           @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  role            Role?            @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   companyProfiles CompanyProfiles?
 
   @@index([roleId], map: "idx_users_role_id")
@@ -36,20 +48,20 @@ model Users {
 }
 
 model CompanyProfiles {
-  id                   Int      @id @default(autoincrement())
-  userId               Int?     @unique @map("user_id")
-  company_name         String?  @db.VarChar(255)
-  slug                 String?  @unique @db.VarChar(255)
-  npwp                 String?  @db.VarChar(50)
-  address              String?  @db.Text
-  province             String?  @db.VarChar(100)
-  country              String?  @db.VarChar(100)
-  phone                String?  @db.VarChar(20)
-  logo_url             String?  @db.Text
-  business_description String?  @db.Text
-  verificationStatus   String?  @map("verification_status") @db.VarChar(20)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                   Int                @id @default(autoincrement())
+  userId               Int?               @unique @map("user_id")
+  company_name         String             @db.VarChar(255)
+  slug                 String             @unique @db.VarChar(255)
+  npwp                 String             @db.Text
+  address              String             @db.Text
+  province             String             @db.VarChar(100)
+  country              String             @db.VarChar(100)
+  phone                String             @db.VarChar(20)
+  logo_url             String?            @db.Text
+  business_description String             @db.Text
+  verificationStatus   VerificationStatus @default(Pending) @map("verification_status")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
 
   user     Users?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   products Product[]
@@ -61,11 +73,11 @@ model CompanyProfiles {
 }
 
 model Categories {
-  id               Int      @id @default(autoincrement())
-  name_categories  String   @db.VarChar(255)
-  slug             String?  @unique @db.VarChar(255)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id              Int      @id @default(autoincrement())
+  name_categories String   @db.VarChar(255)
+  slug            String?  @unique @db.VarChar(255)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   products Product[]
 
@@ -74,24 +86,24 @@ model Categories {
 }
 
 model Product {
-  id            Int      @id @default(autoincrement())
-  supplierId    Int?     @map("supplier_id")
-  categoryId    Int?     @map("category_id")
-  nama          String   @db.VarChar(255)
-  description   String?  @db.Text
-  spectification String? @db.Text
-  min_order     Int      @default(1)
-  unit          String?  @db.VarChar(50)
-  hs_code       String?  @db.VarChar(50)
-  views         Int      @default(0)
-  slug          String?  @unique @db.VarChar(255)
-  status        String?  @db.VarChar(20)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id             Int           @id @default(autoincrement())
+  supplierId     Int?          @map("supplier_id")
+  categoryId     Int?          @map("category_id")
+  nama           String        @db.VarChar(255)
+  description    String?       @db.Text
+  spectification String?       @db.Text
+  min_order      Int           @default(1)
+  unit           String?       @db.VarChar(50)
+  hs_code        String?       @db.VarChar(50)
+  views          Int           @default(0)
+  slug           String?       @unique @db.VarChar(255)
+  status         ProductStatus @default(Pending)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  supplier      CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  category      Categories?      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  images        ProductImages[]
+  supplier  CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category  Categories?      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  images    ProductImages[]
 
   @@index([supplierId], map: "idx_product_supplier_id")
   @@index([categoryId], map: "idx_product_category_id")
@@ -109,7 +121,7 @@ model ProductImages {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([productId], map: "idx_product_images_product_id")
   @@map("product_images")

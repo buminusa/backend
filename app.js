@@ -11,6 +11,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const indexRouter = require('./src/routes/index');
+const authRouter = require('./src/routes/auth');
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ROUTES
 app.use('/', indexRouter);
+app.use('/api/v1/auth', authRouter);
 
 // Health check
 app.get('/health', (req, res) => {
