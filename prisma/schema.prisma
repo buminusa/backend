@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id        Int      @id @default(autoincrement())
+  name_role String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users Users[]
+
+  @@map("role")
+}
+
+model Users {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  roleId    Int?     @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  role            Role?           @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  companyProfiles CompanyProfiles?
+
+  @@index([roleId], map: "idx_users_role_id")
+  @@index([email], map: "idx_users_email")
+  @@map("users")
+}
+
+model CompanyProfiles {
+  id                   Int      @id @default(autoincrement())
+  userId               Int?     @unique @map("user_id")
+  company_name         String?  @db.VarChar(255)
+  slug                 String?  @unique @db.VarChar(255)
+  npwp                 String?  @db.VarChar(50)
+  address              String?  @db.Text
+  province             String?  @db.VarChar(100)
+  country              String?  @db.VarChar(100)
+  phone                String?  @db.VarChar(20)
+  logo_url             String?  @db.Text
+  business_description String?  @db.Text
+  verificationStatus   String?  @map("verification_status") @db.VarChar(20)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user     Users?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  products Product[]
+
+  @@index([userId], map: "idx_company_profiles_user_id")
+  @@index([slug], map: "idx_company_profiles_slug")
+  @@index([verificationStatus], map: "idx_company_profiles_verification_status")
+  @@map("company_profiles")
+}
+
+model Categories {
+  id               Int      @id @default(autoincrement())
+  name_categories  String   @db.VarChar(255)
+  slug             String?  @unique @db.VarChar(255)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@index([slug], map: "idx_categories_slug")
+  @@map("categories")
+}
+
+model Product {
+  id            Int      @id @default(autoincrement())
+  supplierId    Int?     @map("supplier_id")
+  categoryId    Int?     @map("category_id")
+  nama          String   @db.VarChar(255)
+  description   String?  @db.Text
+  spectification String? @db.Text
+  min_order     Int      @default(1)
+  unit          String?  @db.VarChar(50)
+  hs_code       String?  @db.VarChar(50)
+  views         Int      @default(0)
+  slug          String?  @unique @db.VarChar(255)
+  status        String?  @db.VarChar(20)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  supplier      CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category      Categories?      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  images        ProductImages[]
+
+  @@index([supplierId], map: "idx_product_supplier_id")
+  @@index([categoryId], map: "idx_product_category_id")
+  @@index([slug], map: "idx_product_slug")
+  @@index([status], map: "idx_product_status")
+  @@index([hs_code], map: "idx_product_hs_code")
+  @@index([views(sort: Desc)], map: "idx_product_views")
+  @@map("product")
+}
+
+model ProductImages {
+  id        Int      @id @default(autoincrement())
+  productId Int?     @map("product_id")
+  image_url String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([productId], map: "idx_product_images_product_id")
+  @@map("product_images")
+}
