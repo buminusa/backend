@@ -114,7 +114,7 @@ const registerCompany = async (req, res) => {
         });
 
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "User registered successfully",
             data: {
@@ -202,7 +202,7 @@ const registerBuyer = async (req, res) => {
             return { user, buyerProfile };
         })
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
             message: "User registered successfully",
             data: {
