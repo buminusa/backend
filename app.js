@@ -10,8 +10,12 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
+
+
+// routers
 const indexRouter = require('./src/routes/index');
 const authRouter = require('./src/routes/auth');
+const usersRouter = require('./src/routes/usersControllers');
 
 const app = express();
 
@@ -46,6 +50,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ROUTES
 app.use('/', indexRouter);
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/users', usersRouter);
+
 
 // Health check
 app.get('/health', (req, res) => {
