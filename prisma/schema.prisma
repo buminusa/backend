@@ -41,10 +41,28 @@ model Users {
 
   role            Role?            @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   companyProfiles CompanyProfiles?
+  buyerProfiles   BuyerProfiles?
 
   @@index([roleId], map: "idx_users_role_id")
   @@index([email], map: "idx_users_email")
   @@map("users")
+}
+
+model BuyerProfiles {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @unique @map("user_id")
+  full_name String   @db.VarChar(255)
+  address   String   @db.Text
+  province  String   @db.VarChar(100)
+  country   String   @db.VarChar(100)
+  phone     String   @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user Users? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId], map: "idx_buyer_profiles_user_id")
+  @@map("buyer_profiles")
 }
 
 model CompanyProfiles {

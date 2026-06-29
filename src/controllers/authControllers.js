@@ -134,8 +134,95 @@ const registerCompany = async (req, res) => {
     }
 }
 
-// login 
 
+// register for buyer
+const registerBuyer = async (req, res) => {
+    try {
+        const { email, password, full_name, address, province, country, phone } = req.body;
+
+        // field validation
+        if (!email || !password || !full_name || !address || !province || !country || !phone) {
+            return res.status(400).json({
+                success: false,
+                message: "Please fill all the fields"
+            })
+        };
+
+        // cek email sudah terdaftar atau belum
+        const existingUser = await prisma.users.findUnique({
+            where: {
+                email: email
+            }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: "Email already registered"
+            });
+        }
+
+
+        // ambil role buyer 
+        const roleExisting = await prisma.role.findFirst({
+            where: {
+                name_role: "Buyer"
+            }
+        })
+
+        if (!roleExisting) {
+            return res.status(400).json({
+                success: false,
+                message: "Role not found"
+            })
+        }
+
+        // hash password 
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // create user + buyer profile dalam satu transaksi
+        const result = await prisma.$transaction(async (tx) => {
+            const user = await tx.users.create({
+                data: {
+                    email: email,
+                    password: hashedPassword,
+                    roleId: roleExisting.id
+                }
+            });
+            const buyerProfile = await tx.buyerProfiles.create({
+                data: {
+                    userId: user.id,
+                    full_name: full_name,
+                    address: address,
+                    province: province,
+                    country: country,
+                    phone: phone
+                }
+            });
+            return { user, buyerProfile };
+        })
+
+        res.status(201).json({
+            success: true,
+            message: "User registered successfully",
+            data: {
+                userId: result.user.id,
+                email: result.user.email,
+                buyerProfile: result.buyerProfile,
+            }
+        });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
+// login 
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -190,5 +277,6 @@ const login = async (req, res) => {
 
 module.exports = {
     registerCompany,
+    registerBuyer,
     login
 }
