@@ -39,13 +39,22 @@ const uploadNpwp = multer({
   },
 });
 
-const uploadLogo = multer({
-  storage: storageLogo,
-  limits: { fileSize: 1 * 1024 * 1024 },
+const storageProduct = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: "products",
+    allowed_formats: ["jpg", "jpeg", "png"],
+    transformation: [{ quality: "auto" }],
+  },
+});
+
+const uploadProduct = multer({
+  storage: storageProduct,
+  limits: { fileSize: 2 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = ["image/jpeg", "image/png", "image/jpg"];
     if (!allowed.includes(file.mimetype)) {
-      return cb(new Error("Format file tidak didukung. Gunakan JPG atau PNG."));
+      return cb(new Error("Format file gambar produk tidak didukung. Gunakan JPG atau PNG."));
     }
     cb(null, true);
   },
@@ -82,4 +91,4 @@ const uploadRegister = multer({
   }
 });
 
-module.exports = { cloudinary, uploadRegister, uploadNpwp, uploadLogo };
+module.exports = { cloudinary, uploadRegister, uploadNpwp, uploadLogo, uploadProduct };
