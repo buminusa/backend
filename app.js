@@ -14,9 +14,9 @@ const rateLimit = require('express-rate-limit');
 
 // routers
 const indexRouter = require('./src/routes/index');
-const authRouter = require('./src/routes/auth');
-const usersRouter = require('./src/routes/usersControllers');
-const productsRouter = require('./src/routes/products');
+const authRouter = require('./src/routes/authRoutes');
+const usersRouter = require('./src/routes/usersRoutes');
+const productsRouter = require('./src/routes/productsRoutes');
 
 const app = express();
 
