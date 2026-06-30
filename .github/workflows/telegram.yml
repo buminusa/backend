@@ -12,70 +12,68 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send Telegram Notification (Push)
-        if: github.event_name == 'push'
+      - name: Send Telegram Notification
         env:
           TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMITS_JSON: ${{ toJson(github.event.commits) }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
         run: |
-          REPO="${{ github.repository }}"
-          BRANCH="${{ github.ref_name }}"
-          ACTOR="${{ github.actor }}"
-          COUNT=$(echo '${{ toJson(github.event.commits) }}' | jq 'length')
+          set -e
 
-          MESSAGE="🚀 [$REPO:$BRANCH] $COUNT new commit(s) by $ACTOR
-          "
+          if [ "$EVENT_NAME" = "push" ]; then
+            COUNT=$(echo "$COMMITS_JSON" | jq 'length')
 
-          # Loop tiap commit, format mirip UI GitHub: hash pendek - pesan - author
-          echo '${{ toJson(github.event.commits) }}' | jq -r '.[] | "\(.id[0:7]) \(.message | split("\n")[0]) - \(.author.username // .author.name)"' > commits.txt
+            if [ "$COUNT" -eq 0 ]; then
+              echo "No commits in push event, skipping."
+              exit 0
+            fi
 
-          while IFS= read -r line; do
-            MESSAGE="$MESSAGE
-          \`$line\`"
-          done < commits.txt
+            COMMIT_LIST=$(echo "$COMMITS_JSON" | jq -r '.[] | "`\(.id[0:7])` \(.message | split("\n")[0]) - \(.author.username // .author.name)"')
 
-          MESSAGE="$MESSAGE
+            MESSAGE="🚀 [$REPO:$REF_NAME] $COUNT new commit(s) by $ACTOR
 
-          🔗 https://github.com/$REPO/commits/$BRANCH"
+          $COMMIT_LIST
+
+          🔗 https://github.com/$REPO/commits/$REF_NAME"
+
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            MESSAGE="🔀 Pull Request $PR_ACTION
+
+          📦 Repository: $REPO
+          👤 User: $ACTOR
+          📌 Title: $PR_TITLE
+          🌿 $PR_HEAD → $PR_BASE
+
+          🔗 $PR_URL"
+
+          elif [ "$EVENT_NAME" = "release" ]; then
+            MESSAGE="🎉 New Release Published
+
+          📦 Repository: $REPO
+          🏷️ Tag: $RELEASE_TAG
+          📌 Name: $RELEASE_NAME
+
+          🔗 $RELEASE_URL"
+
+          else
+            MESSAGE="📣 GitHub Event: $EVENT_NAME
+          📦 Repository: $REPO
+          👤 User: $ACTOR"
+          fi
 
           curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
             -d chat_id="$CHAT_ID" \
             -d parse_mode="Markdown" \
-            --data-urlencode text="$MESSAGE"
-
-      - name: Send Telegram Notification (PR)
-        if: github.event_name == 'pull_request'
-        env:
-          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          MESSAGE="🔀 Pull Request ${{ github.event.action }}
-
-          📦 Repository: ${{ github.repository }}
-          👤 User: ${{ github.actor }}
-          📌 Title: ${{ github.event.pull_request.title }}
-          🌿 ${{ github.event.pull_request.head.ref }} → ${{ github.event.pull_request.base.ref }}
-
-          🔗 ${{ github.event.pull_request.html_url }}"
-
-          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
-            -d chat_id="$CHAT_ID" \
-            --data-urlencode text="$MESSAGE"
-
-      - name: Send Telegram Notification (Release)
-        if: github.event_name == 'release'
-        env:
-          TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          MESSAGE="🎉 New Release Published
-
-          📦 Repository: ${{ github.repository }}
-          🏷️ Tag: ${{ github.event.release.tag_name }}
-          📌 Name: ${{ github.event.release.name }}
-
-          🔗 ${{ github.event.release.html_url }}"
-
-          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
-            -d chat_id="$CHAT_ID" \
             --data-urlencode text="$MESSAGE"
