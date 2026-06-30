@@ -91,4 +91,4 @@ const uploadRegister = multer({
   }
 });
 
-module.exports = { cloudinary, uploadRegister, uploadNpwp, uploadLogo, uploadProduct };
+module.exports = { cloudinary, uploadRegister, uploadNpwp, uploadProduct };

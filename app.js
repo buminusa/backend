@@ -16,6 +16,7 @@ const rateLimit = require('express-rate-limit');
 const indexRouter = require('./src/routes/index');
 const authRouter = require('./src/routes/auth');
 const usersRouter = require('./src/routes/usersControllers');
+const productsRouter = require('./src/routes/products');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/users', usersRouter);
+app.use('/api/v1/products', productsRouter);
 
 
 // Health check
