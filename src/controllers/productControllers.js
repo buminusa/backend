@@ -94,7 +94,8 @@ const createProduct = async (req, res) => {
 
 const getAllProducts = async (req, res) => {
   try {
-    const { status, categoryId, supplierId, search } = req.query;
+    const { page = 1, limit = 10, status, categoryId, supplierId, search } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {
       ...(status ? { status } : { status: "Active" }),
@@ -110,26 +111,37 @@ const getAllProducts = async (req, res) => {
         : {}),
     };
 
-    const products = await prisma.product.findMany({
-      where,
-      include: {
-        category: true,
-        supplier: {
-          select: {
-            id: true,
-            company_name: true,
-            slug: true,
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        skip,
+        take: parseInt(limit),
+        include: {
+          category: true,
+          supplier: {
+            select: {
+              id: true,
+              company_name: true,
+              slug: true,
+            },
           },
+          images: true,
         },
-        images: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.product.count({ where }),
+    ]);
 
     return res.status(200).json({
       success: true,
       message: "List produk berhasil diambil.",
       data: products,
+      meta: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
     });
   } catch (error) {
     console.error(error);

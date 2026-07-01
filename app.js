@@ -18,6 +18,8 @@ const authRouter = require('./src/routes/authRoutes');
 const usersRouter = require('./src/routes/usersRoutes');
 const productsRouter = require('./src/routes/productsRoutes');
 const companyProfileRouter = require('./src/routes/companyProfileRoutes');
+const buyerRouter = require('./src/routes/buyerRoutes');
+const categoriesRouter = require('./src/routes/categoriesRoutes');
 
 const app = express();
 
@@ -55,6 +57,8 @@ app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/products', productsRouter);
 app.use('/api/v1/company-profiles', companyProfileRouter);
+app.use('/api/v1/buyers', buyerRouter);
+app.use('/api/v1/categories', categoriesRouter);
 
 // Health check
 app.get('/health', (req, res) => {
