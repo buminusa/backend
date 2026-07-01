@@ -12,23 +12,69 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Get Jakarta Time
+        id: time
+        run: |
+          echo "now=$(TZ='Asia/Jakarta' date '+%d %B %Y, %H:%M WIB')" >> "$GITHUB_OUTPUT"
+
       - name: Send Telegram Notification
         env:
           TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          MESSAGE="🚀 GitHub Notification
+          REPO="${{ github.repository }}"
+          ACTOR="${{ github.actor }}"
+          EVENT="${{ github.event_name }}"
+          BRANCH="${{ github.ref_name }}"
+          NOW="${{ steps.time.outputs.now }}"
+          COMMIT_URL="https://github.com/${REPO}/commit/${{ github.sha }}"
 
-          📦 Repository: ${{ github.repository }}
-          👤 User: ${{ github.actor }}
-          📌 Event: ${{ github.event_name }}
-          🌿 Branch: ${{ github.ref_name }}
-
-          💬 Commit:
+          case "$EVENT" in
+            push)
+              TITLE="🚀 <b>Push Baru</b>"
+              BODY="💬 <b>Commit:</b>
           ${{ github.event.head_commit.message }}
 
-          🔗 https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+          🔗 <a href=\"${COMMIT_URL}\">Lihat Commit</a>"
+              ;;
+            pull_request)
+              PR_ACTION="${{ github.event.action }}"
+              PR_TITLE="${{ github.event.pull_request.title }}"
+              PR_URL="${{ github.event.pull_request.html_url }}"
+              PR_NUM="${{ github.event.pull_request.number }}"
+              TITLE="🔀 <b>Pull Request ${PR_ACTION}</b>"
+              BODY="📝 <b>Judul:</b> ${PR_TITLE}
+          🔢 <b>PR:</b> #${PR_NUM}
 
-          curl -s -X POST "https://api.telegram.org/bot$TOKEN/sendMessage" \
-            -d chat_id="$CHAT_ID" \
-            --data-urlencode text="$MESSAGE"
+          🔗 <a href=\"${PR_URL}\">Lihat Pull Request</a>"
+              ;;
+            release)
+              REL_NAME="${{ github.event.release.name }}"
+              REL_TAG="${{ github.event.release.tag_name }}"
+              REL_URL="${{ github.event.release.html_url }}"
+              TITLE="🏷️ <b>Release Baru Dirilis</b>"
+              BODY="📛 <b>Nama:</b> ${REL_NAME}
+          🔖 <b>Tag:</b> ${REL_TAG}
+
+          🔗 <a href=\"${REL_URL}\">Lihat Release</a>"
+              ;;
+            *)
+              TITLE="📢 <b>GitHub Event</b>"
+              BODY=""
+              ;;
+          esac
+
+          MESSAGE="${TITLE}
+
+          📦 <b>Repository:</b> ${REPO}
+          👤 <b>User:</b> ${ACTOR}
+          🌿 <b>Branch:</b> ${BRANCH}
+          🕒 <b>Waktu:</b> ${NOW}
+
+          ${BODY}"
+
+          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            -d chat_id="${CHAT_ID}" \
+            -d parse_mode="HTML" \
+            -d disable_web_page_preview="true" \
+            --data-urlencode text="${MESSAGE}"
