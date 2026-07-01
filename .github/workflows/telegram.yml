@@ -21,22 +21,64 @@ jobs:
         env:
           TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
           REPO="${{ github.repository }}"
           ACTOR="${{ github.actor }}"
           EVENT="${{ github.event_name }}"
           BRANCH="${{ github.ref_name }}"
           NOW="${{ steps.time.outputs.now }}"
-          COMMIT_URL="https://github.com/${REPO}/commit/${{ github.sha }}"
+
+          send_message() {
+            local TITLE="$1"
+            local BODY="$2"
+            local MESSAGE="${TITLE}
+
+          📦 <b>Repository:</b> ${REPO}
+          👤 <b>User:</b> ${ACTOR}
+          🌿 <b>Branch:</b> ${BRANCH}
+          🕒 <b>Date & Time:</b> ${NOW}
+
+          ${BODY}"
+
+            curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+              -d chat_id="${CHAT_ID}" \
+              -d parse_mode="HTML" \
+              -d disable_web_page_preview="true" \
+              --data-urlencode text="${MESSAGE}"
+          }
 
           case "$EVENT" in
             push)
               TITLE="🚀 <b>GitHub Notification</b>"
-              BODY="💬 <b>Commit:</b>
+              COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
+
+              if [ "$COUNT" -eq 0 ]; then
+                # fallback kalau tidak ada array commits (misal push tag tanpa commit baru)
+                SHA="${{ github.sha }}"
+                COMMIT_URL="https://github.com/${REPO}/commit/${SHA}"
+                BODY="💬 <b>Commit:</b>
           ${{ github.event.head_commit.message }}
 
           🔗 <a href=\"${COMMIT_URL}\">Lihat Commit</a>"
+                send_message "$TITLE" "$BODY"
+              else
+                for i in $(seq 0 $((COUNT - 1))); do
+                  MSG=$(jq -r ".commits[$i].message" "$GITHUB_EVENT_PATH")
+                  URL=$(jq -r ".commits[$i].url" "$GITHUB_EVENT_PATH")
+                  AUTHOR=$(jq -r ".commits[$i].author.name" "$GITHUB_EVENT_PATH")
+                  SHORT_SHA=$(jq -r ".commits[$i].id" "$GITHUB_EVENT_PATH" | cut -c1-7)
+
+                  BODY="💬 <b>Commit:</b> ${MSG}
+          🧑‍💻 <b>Author:</b> ${AUTHOR}
+          🔑 <b>SHA:</b> ${SHORT_SHA}
+
+          🔗 <a href=\"${URL}\">Lihat Commit</a>"
+                  send_message "$TITLE" "$BODY"
+                done
+              fi
               ;;
+
             pull_request)
               PR_ACTION="${{ github.event.action }}"
               PR_TITLE="${{ github.event.pull_request.title }}"
@@ -47,7 +89,9 @@ jobs:
           🔢 <b>PR:</b> #${PR_NUM}
 
           🔗 <a href=\"${PR_URL}\">Lihat Pull Request</a>"
+              send_message "$TITLE" "$BODY"
               ;;
+
             release)
               REL_NAME="${{ github.event.release.name }}"
               REL_TAG="${{ github.event.release.tag_name }}"
@@ -57,23 +101,12 @@ jobs:
           🔖 <b>Tag:</b> ${REL_TAG}
 
           🔗 <a href=\"${REL_URL}\">Lihat Release</a>"
+              send_message "$TITLE" "$BODY"
               ;;
+
             *)
               TITLE="📢 <b>GitHub Event</b>"
               BODY=""
+              send_message "$TITLE" "$BODY"
               ;;
           esac
-
-          MESSAGE="${TITLE}
-
-          📦 <b>Repository:</b> ${REPO}
-          👤 <b>User:</b> ${ACTOR}
-          🌿 <b>Branch:</b> ${BRANCH}
-          🕒 <b>Data & Time:</b> ${NOW}
-
-          ${BODY}"
-          curl -s -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
-            -d chat_id="${CHAT_ID}" \
-            -d parse_mode="HTML" \
-            -d disable_web_page_preview="true" \
-            --data-urlencode text="${MESSAGE}"
