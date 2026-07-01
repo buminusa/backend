@@ -6,7 +6,7 @@ const getCompanyProfile = async (req, res) => {
 
         const { id } = req.params;
 
-        const companyProfile = await prisma.companyProfile.findUnique({
+        const companyProfile = await prisma.companyProfiles.findUnique({
             where: {
                 userId: parseInt(id)
             },
@@ -68,7 +68,7 @@ const getAllCompanyProfiles = async (req, res) => {
         const where = status ? { verificationStatus: status } : {};
 
         const [companies, total] = await Promise.all([
-            prisma.companyProfile.findMany({
+            prisma.companyProfiles.findMany({
                 where,
                 skip,
                 take: parseInt(limit),
@@ -91,7 +91,7 @@ const getAllCompanyProfiles = async (req, res) => {
                     }
                 }
             }),
-            prisma.companyProfile.count({ where })
+            prisma.companyProfiles.count({ where })
         ]);
 
         res.status(200).json({
@@ -121,7 +121,7 @@ const updateCompanyProfile = async (req, res) => {
         const { id } = req.params;
         const { company_name, address, province, country, phone, business_description } = req.body;
 
-        const existing = await prisma.companyProfile.findUnique({
+        const existing = await prisma.companyProfiles.findUnique({
             where: { userId: parseInt(id) }
         });
 
@@ -141,14 +141,14 @@ const updateCompanyProfile = async (req, res) => {
                 .trim()
                 .replace(/\s+/g, "-");
 
-            const slugTaken = await prisma.companyProfile.findFirst({
+            const slugTaken = await prisma.companyProfiles.findFirst({
                 where: { slug: baseSlug, NOT: { id: existing.id } }
             });
 
             slug = slugTaken ? `${baseSlug}-${Date.now()}` : baseSlug;
         }
 
-        const updated = await prisma.companyProfile.update({
+        const updated = await prisma.companyProfiles.update({
             where: { userId: parseInt(id) },
             data: {
                 ...(company_name && { company_name, slug }),
@@ -188,7 +188,7 @@ const updateLogo = async (req, res) => {
             });
         }
 
-        const existing = await prisma.companyProfile.findUnique({
+        const existing = await prisma.companyProfiles.findUnique({
             where: { userId: parseInt(id) }
         });
 
@@ -199,7 +199,7 @@ const updateLogo = async (req, res) => {
             });
         }
 
-        const updated = await prisma.companyProfile.update({
+        const updated = await prisma.companyProfiles.update({
             where: { userId: parseInt(id) },
             data: { logo_url: logo },
             select: { id: true, company_name: true, logo_url: true, updatedAt: true }
@@ -235,7 +235,7 @@ const updateVerificationStatus = async (req, res) => {
             });
         }
 
-        const existing = await prisma.companyProfile.findUnique({
+        const existing = await prisma.companyProfiles.findUnique({
             where: { id: parseInt(id) }
         });
 
@@ -246,7 +246,7 @@ const updateVerificationStatus = async (req, res) => {
             });
         }
 
-        const updated = await prisma.companyProfile.update({
+        const updated = await prisma.companyProfiles.update({
             where: { id: parseInt(id) },
             data: { verificationStatus },
             select: {
