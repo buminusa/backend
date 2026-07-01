@@ -5,7 +5,7 @@ const { authenticate, authorize } = require("../middlewares/authMiddleware");
 const { uploadLogo } = require("../config/cloudinary"); 
 
 // get all company profiles
-router.get("/", authorize("ADMIN"), companyProfileControllers.getAllCompanyProfiles);
+router.get("/",authenticate, authorize("ADMIN"), companyProfileControllers.getAllCompanyProfiles);
 
 // get company profile by user id
 router.get("/:id", authenticate, companyProfileControllers.getCompanyProfile);
