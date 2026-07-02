@@ -17,6 +17,18 @@ jobs:
         run: |
           echo "now=$(TZ='Asia/Jakarta' date '+%d %B %Y, %H:%M WIB')" >> "$GITHUB_OUTPUT"
 
+      - name: Restore notified SHA cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: .notified_shas.txt
+          key: notified-shas-${{ github.run_id }}
+          restore-keys: |
+            notified-shas-
+
+      - name: Ensure cache file exists
+        run: touch .notified_shas.txt
+
       - name: Send Telegram Notification
         env:
           TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -28,6 +40,15 @@ jobs:
           EVENT="${{ github.event_name }}"
           BRANCH="${{ github.ref_name }}"
           NOW="${{ steps.time.outputs.now }}"
+          SHA_LOG=".notified_shas.txt"
+
+          already_notified() {
+            grep -qxF "$1" "$SHA_LOG"
+          }
+
+          mark_notified() {
+            echo "$1" >> "$SHA_LOG"
+          }
 
           send_message() {
             local TITLE="$1"
@@ -54,20 +75,31 @@ jobs:
               COUNT=$(jq '.commits | length' "$GITHUB_EVENT_PATH")
 
               if [ "$COUNT" -eq 0 ]; then
-                # fallback kalau tidak ada array commits (misal push tag tanpa commit baru)
                 SHA="${{ github.sha }}"
-                COMMIT_URL="https://github.com/${REPO}/commit/${SHA}"
-                BODY="💬 <b>Commit:</b>
+
+                if already_notified "$SHA"; then
+                  echo "SHA $SHA sudah pernah dinotif, skip."
+                else
+                  COMMIT_URL="https://github.com/${REPO}/commit/${SHA}"
+                  BODY="💬 <b>Commit:</b>
           ${{ github.event.head_commit.message }}
 
           🔗 <a href=\"${COMMIT_URL}\">Lihat Commit</a>"
-                send_message "$TITLE" "$BODY"
+                  send_message "$TITLE" "$BODY"
+                  mark_notified "$SHA"
+                fi
               else
                 for i in $(seq 0 $((COUNT - 1))); do
                   MSG=$(jq -r ".commits[$i].message" "$GITHUB_EVENT_PATH")
                   URL=$(jq -r ".commits[$i].url" "$GITHUB_EVENT_PATH")
                   AUTHOR=$(jq -r ".commits[$i].author.name" "$GITHUB_EVENT_PATH")
-                  SHORT_SHA=$(jq -r ".commits[$i].id" "$GITHUB_EVENT_PATH" | cut -c1-7)
+                  FULL_SHA=$(jq -r ".commits[$i].id" "$GITHUB_EVENT_PATH")
+                  SHORT_SHA=$(echo "$FULL_SHA" | cut -c1-7)
+
+                  if already_notified "$FULL_SHA"; then
+                    echo "SHA $FULL_SHA sudah pernah dinotif, skip."
+                    continue
+                  fi
 
                   BODY="💬 <b>Commit:</b> ${MSG}
           🧑‍💻 <b>Author:</b> ${AUTHOR}
@@ -75,6 +107,7 @@ jobs:
 
           🔗 <a href=\"${URL}\">Lihat Commit</a>"
                   send_message "$TITLE" "$BODY"
+                  mark_notified "$FULL_SHA"
                 done
               fi
               ;;
@@ -110,3 +143,13 @@ jobs:
               send_message "$TITLE" "$BODY"
               ;;
           esac
+
+          # Batasi log maksimal 500 SHA terakhir biar file gak membengkak
+          tail -n 500 "$SHA_LOG" > "$SHA_LOG.tmp" && mv "$SHA_LOG.tmp" "$SHA_LOG"
+
+      - name: Save notified SHA cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .notified_shas.txt
+          key: notified-shas-${{ github.run_id }}
