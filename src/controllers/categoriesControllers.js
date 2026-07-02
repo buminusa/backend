@@ -93,6 +93,46 @@ const getCategoryById = async (req, res) => {
   }
 };
 
+const getCategoryBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const category = await prisma.categories.findUnique({
+      where: { slug },
+      include: {
+        products: {
+          select: {
+            id: true,
+            nama: true,
+            slug: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Category retrieved successfully",
+      data: category,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 const createCategory = async (req, res) => {
   try {
     const { name_categories, slug } = req.body;
@@ -217,6 +257,7 @@ const deleteCategory = async (req, res) => {
 module.exports = {
   getAllCategories,
   getCategoryById,
+  getCategoryBySlug,
   createCategory,
   updateCategory,
   deleteCategory,
