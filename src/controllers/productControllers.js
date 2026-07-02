@@ -1,5 +1,5 @@
 const prisma = require("../config/prisma");
-const { generateUniqueSlug } = require("../utils/slugify");
+const { generateUniqueSlug } = require("../utils/slug");
 
 // define data to include in product queries
 const productInclude = {
