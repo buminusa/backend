@@ -29,11 +29,11 @@ const getAllProducts = async (req, res) => {
       ...(hs_code ? { hs_code } : {}),
       ...(search
         ? {
-            OR: [
-              { nama: { contains: search, mode: "insensitive" } },
-              { description: { contains: search, mode: "insensitive" } },
-            ],
-          }
+          OR: [
+            { nama: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+          ],
+        }
         : {}),
     };
 
@@ -123,6 +123,50 @@ const getProductBySlug = async (req, res) => {
       success: true,
       message: "Detail produk berhasil diambil.",
       data: product,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+
+// get popular products (top 5 by views)
+const getPopularProducts = async (req, res) => {
+  try {
+    const { page = 1, limit = 12, categoryId } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const where = {
+      status: "Active",
+      ...(categoryId ? { categoryId: Number(categoryId) } : {}),
+    };
+
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        skip: skip,
+        take: parseInt(limit),
+        include: productInclude,
+        orderBy: { views: "desc" },
+      }),
+      prisma.product.count({ where }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Produk populer berhasil diambil.",
+      data: products,
+      meta: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
     });
   } catch (error) {
     console.error(error);
@@ -448,10 +492,12 @@ const deleteProductImage = async (req, res) => {
   }
 };
 
+
 module.exports = {
   getAllProducts,
   getProductById,
   getProductBySlug,
+  getPopularProducts,
   createProduct,
   updateProduct,
   updateProductStatus,

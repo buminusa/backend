@@ -8,6 +8,7 @@ const { uploadProduct } = require("../config/cloudinary");
 
 router.get("/", authenticate, productController.getAllProducts);
 router.get("/slug/:slug", authenticate, productController.getProductBySlug);
+router.get("/popular", authenticate, productController.getPopularProducts);
 router.get("/:id", authenticate, productController.getProductById);
 
 // crate product
