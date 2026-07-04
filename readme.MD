@@ -114,7 +114,6 @@ Base URL: `/api/v1`
 | DELETE | `/:id` | Supplier, Super_Admin | Hapus produk |
 | DELETE | `/images/:imageId` | Supplier | Hapus gambar produk |
 
-> Catatan: rute statis (`/popular`, `/slug/:slug`) didefinisikan sebelum rute dinamis (`/:id`) agar tidak tertangkap sebagai parameter.
 
 ### Categories (`/categories`)
 | Method | Endpoint | Deskripsi |
