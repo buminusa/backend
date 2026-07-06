@@ -20,6 +20,15 @@ enum ProductStatus {
   Rejected
 }
 
+enum OrderStatus {
+  Pending
+  Confirmed
+  Processing
+  Shipped
+  Completed
+  Cancelled
+}
+
 model Role {
   id        Int      @id @default(autoincrement())
   name_role String   @db.VarChar(100)
@@ -60,6 +69,7 @@ model BuyerProfiles {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   user Users? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  orders Orders[]
 
   @@index([userId], map: "idx_buyer_profiles_user_id")
   @@map("buyer_profiles")
@@ -83,6 +93,7 @@ model CompanyProfiles {
 
   user     Users?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   products Product[]
+  orders Orders[]
 
   @@index([userId], map: "idx_company_profiles_user_id")
   @@index([slug], map: "idx_company_profiles_slug")
@@ -122,6 +133,7 @@ model Product {
   supplier  CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   category  Categories?      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   images    ProductImages[]
+  orderItems OrderItems[]
 
   @@index([supplierId], map: "idx_product_supplier_id")
   @@index([categoryId], map: "idx_product_category_id")
@@ -143,4 +155,46 @@ model ProductImages {
 
   @@index([productId], map: "idx_product_images_product_id")
   @@map("product_images")
+}
+
+model Orders {
+  id                Int         @id @default(autoincrement())
+  buyerId           Int?        @map("buyer_id")
+  supplierId        Int?        @map("supplier_id")
+  order_number      String      @unique @db.VarChar(50)
+  status            OrderStatus @default(Pending)
+  total_amount      Decimal     @db.Decimal(15, 2)
+  shipping_address  String      @db.Text
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  buyer      BuyerProfiles?   @relation(fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  supplier   CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  orderItems OrderItems[]
+
+  @@index([buyerId], map: "idx_orders_buyer_id")
+  @@index([supplierId], map: "idx_orders_supplier_id")
+  @@index([status], map: "idx_orders_status")
+  @@index([order_number], map: "idx_orders_order_number")
+  @@map("orders")
+}
+
+
+model OrderItems {
+  id        Int      @id @default(autoincrement())
+  orderId   Int?     @map("order_id")
+  productId Int?     @map("product_id")
+  quantity  Int      @default(1)
+  price     Decimal  @db.Decimal(15, 2)
+  subtotal  Decimal  @db.Decimal(15, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  order   Orders?  @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([orderId], map: "idx_order_items_order_id")
+  @@index([productId], map: "idx_order_items_product_id")
+  @@map("order_items")
 }
