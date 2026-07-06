@@ -68,7 +68,7 @@ model BuyerProfiles {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user Users? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  user   Users?   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   orders Orders[]
 
   @@index([userId], map: "idx_buyer_profiles_user_id")
@@ -93,7 +93,7 @@ model CompanyProfiles {
 
   user     Users?    @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   products Product[]
-  orders Orders[]
+  orders   Orders[]
 
   @@index([userId], map: "idx_company_profiles_user_id")
   @@index([slug], map: "idx_company_profiles_slug")
@@ -122,6 +122,8 @@ model Product {
   description    String?       @db.Text
   spectification String?       @db.Text
   min_order      Int           @default(1)
+  price_min      Decimal       @db.Decimal(15, 2)
+  price_max      Decimal       @db.Decimal(15, 2)
   unit           String?       @db.VarChar(50)
   hs_code        String?       @db.VarChar(50)
   views          Int           @default(0)
@@ -130,9 +132,9 @@ model Product {
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  supplier  CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  category  Categories?      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  images    ProductImages[]
+  supplier   CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  category   Categories?      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  images     ProductImages[]
   orderItems OrderItems[]
 
   @@index([supplierId], map: "idx_product_supplier_id")
@@ -158,16 +160,16 @@ model ProductImages {
 }
 
 model Orders {
-  id                Int         @id @default(autoincrement())
-  buyerId           Int?        @map("buyer_id")
-  supplierId        Int?        @map("supplier_id")
-  order_number      String      @unique @db.VarChar(50)
-  status            OrderStatus @default(Pending)
-  total_amount      Decimal     @db.Decimal(15, 2)
-  shipping_address  String      @db.Text
-  notes             String?     @db.Text
-  createdAt         DateTime    @default(now()) @map("created_at")
-  updatedAt         DateTime    @updatedAt @map("updated_at")
+  id               Int         @id @default(autoincrement())
+  buyerId          Int?        @map("buyer_id")
+  supplierId       Int?        @map("supplier_id")
+  order_number     String      @unique @db.VarChar(50)
+  status           OrderStatus @default(Pending)
+  total_amount     Decimal     @db.Decimal(15, 2)
+  shipping_address String      @db.Text
+  notes            String?     @db.Text
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   buyer      BuyerProfiles?   @relation(fields: [buyerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   supplier   CompanyProfiles? @relation(fields: [supplierId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -179,7 +181,6 @@ model Orders {
   @@index([order_number], map: "idx_orders_order_number")
   @@map("orders")
 }
-
 
 model OrderItems {
   id        Int      @id @default(autoincrement())
