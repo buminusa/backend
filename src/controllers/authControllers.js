@@ -42,18 +42,19 @@ const registerCompany = async (req, res) => {
         };
 
         // ambil role supplier
-        const roleExisting = await prisma.role.findFirst({
+        let roleExisting = await prisma.role.findFirst({
             where: {
                 name_role: "Supplier"
             }
         });
 
         if (!roleExisting) {
-            return res.status(400).json({
-                success: false,
-                message: "Role not found"
-            })
-        };
+            roleExisting = await prisma.role.create({
+                data: {
+                    name_role: "Supplier"
+                }
+            });
+        }
 
         // hash password
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -164,17 +165,18 @@ const registerBuyer = async (req, res) => {
 
 
         // ambil role buyer 
-        const roleExisting = await prisma.role.findFirst({
+        let roleExisting = await prisma.role.findFirst({
             where: {
                 name_role: "Buyer"
             }
         })
 
         if (!roleExisting) {
-            return res.status(400).json({
-                success: false,
-                message: "Role not found"
-            })
+            roleExisting = await prisma.role.create({
+                data: {
+                    name_role: "Buyer"
+                }
+            });
         }
 
         // hash password 

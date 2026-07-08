@@ -1,3 +1,13 @@
+const path = require("path");
+const dotenv = require("dotenv");
+
+for (const envFile of [
+  path.resolve(__dirname, "../../.env"),
+  path.resolve(__dirname, "../../../frontend/.env"),
+]) {
+  dotenv.config({ path: envFile });
+}
+
 const { PrismaClient } = require("../generated/prisma");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { Pool } = require("pg");

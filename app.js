@@ -1,7 +1,14 @@
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+for (const envFile of [
+  path.resolve(__dirname, '.env'),
+  path.resolve(__dirname, '../frontend/.env'),
+]) {
+  dotenv.config({ path: envFile });
+}
 
 const express = require('express');
-const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const createError = require('http-errors');
