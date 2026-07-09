@@ -1,12 +1,6 @@
 const path = require('path');
 const dotenv = require('dotenv');
-
-for (const envFile of [
-  path.resolve(__dirname, '.env'),
-  path.resolve(__dirname, '../frontend/.env'),
-]) {
-  dotenv.config({ path: envFile });
-}
+dotenv.config();  
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
@@ -27,6 +21,7 @@ const productsRouter = require('./src/routes/productsRoutes');
 const companyProfileRouter = require('./src/routes/companyProfileRoutes');
 const buyerRouter = require('./src/routes/buyerRoutes');
 const categoriesRouter = require('./src/routes/categoriesRoutes');
+const orderRouter = require('./src/routes/ordersRoutes');
 
 const app = express();
 
@@ -34,7 +29,7 @@ const app = express();
 // SECURITY
 app.use(helmet());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+  origin: process.env.FRONTEND_URL?.split(',') || '*', 
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -66,6 +61,7 @@ app.use('/api/v1/products', productsRouter);
 app.use('/api/v1/company-profiles', companyProfileRouter);
 app.use('/api/v1/buyers', buyerRouter);
 app.use('/api/v1/categories', categoriesRouter);
+app.use('/api/v1/orders', orderRouter);
 
 // Health check
 app.get('/health', (req, res) => {
