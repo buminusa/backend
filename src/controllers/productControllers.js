@@ -182,12 +182,29 @@ const getPopularProducts = async (req, res) => {
 // create product
 const createProduct = async (req, res) => {
   try {
-    const { nama, description, spectification, min_order, unit, hs_code, categoryId } = req.body;
+    const {
+      nama,
+      description,
+      spectification,
+      min_order,
+      price_min,
+      price_max,
+      unit,
+      hs_code,
+      categoryId,
+    } = req.body;
 
-    if (!nama || !min_order) {
+    if (!nama || !min_order || price_min === undefined || price_max === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Nama produk dan minimal order wajib diisi.",
+        message: "Nama produk, minimal order, price_min, dan price_max wajib diisi.",
+      });
+    }
+
+    if (Number(price_min) > Number(price_max)) {
+      return res.status(400).json({
+        success: false,
+        message: "price_min tidak boleh lebih besar dari price_max.",
       });
     }
 
@@ -212,6 +229,8 @@ const createProduct = async (req, res) => {
         description: description || null,
         spectification: spectification || null,
         min_order: Number(min_order),
+        price_min: Number(price_min),
+        price_max: Number(price_max),
         unit: unit || null,
         hs_code: hs_code || null,
         slug: finalSlug,
@@ -258,7 +277,17 @@ const createProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
   try {
     const productId = Number(req.params.id);
-    const { nama, description, spectification, min_order, unit, hs_code, categoryId } = req.body;
+    const {
+      nama,
+      description,
+      spectification,
+      min_order,
+      price_min,
+      price_max,
+      unit,
+      hs_code,
+      categoryId,
+    } = req.body;
 
     const companyProfile = await prisma.companyProfiles.findUnique({
       where: { userId: req.user.id },
@@ -289,11 +318,23 @@ const updateProduct = async (req, res) => {
       });
     }
 
+    // Validate price range if either value is being updated
+    const nextPriceMin = price_min !== undefined ? Number(price_min) : Number(existingProduct.price_min);
+    const nextPriceMax = price_max !== undefined ? Number(price_max) : Number(existingProduct.price_max);
+    if (nextPriceMin > nextPriceMax) {
+      return res.status(400).json({
+        success: false,
+        message: "price_min tidak boleh lebih besar dari price_max.",
+      });
+    }
+
     const data = {
       ...(nama ? { nama } : {}),
       ...(description !== undefined ? { description: description || null } : {}),
       ...(spectification !== undefined ? { spectification: spectification || null } : {}),
       ...(min_order ? { min_order: Number(min_order) } : {}),
+      ...(price_min !== undefined ? { price_min: Number(price_min) } : {}),
+      ...(price_max !== undefined ? { price_max: Number(price_max) } : {}),
       ...(unit !== undefined ? { unit: unit || null } : {}),
       ...(hs_code !== undefined ? { hs_code: hs_code || null } : {}),
       ...(categoryId ? { categoryId: Number(categoryId) } : {}),
