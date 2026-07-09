@@ -302,10 +302,12 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            if (!price || price < Number(product.price_min) || price > Number(product.price_max)) {
+            // Catatan: price_min/price_max pada Product hanya rentang informasi untuk frontend,
+            // jadi harga final order tidak divalidasi terhadap rentang tersebut.
+            if (!price || price <= 0) {
                 return res.status(400).json({
                     success: false,
-                    message: `Price product "${product.nama}" harus di antara ${product.price_min} - ${product.price_max}`
+                    message: `Price product "${product.nama}" tidak valid`
                 });
             }
 
