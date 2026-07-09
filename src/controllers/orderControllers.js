@@ -288,12 +288,10 @@ const createOrder = async (req, res) => {
         const supplierId = supplierIds[0];
 
         const orderItemsData = [];
-        let total_amount = 0;
 
         for (const item of items) {
             const product = products.find((p) => p.id === Number(item.productId));
             const quantity = Number(item.quantity);
-            const price = Number(item.price);
 
             if (!quantity || quantity < product.min_order) {
                 return res.status(400).json({
@@ -302,23 +300,9 @@ const createOrder = async (req, res) => {
                 });
             }
 
-            // Catatan: price_min/price_max pada Product hanya rentang informasi untuk frontend,
-            // jadi harga final order tidak divalidasi terhadap rentang tersebut.
-            if (!price || price <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Price product "${product.nama}" tidak valid`
-                });
-            }
-
-            const subtotal = quantity * price;
-            total_amount += subtotal;
-
             orderItemsData.push({
                 productId: product.id,
-                quantity,
-                price,
-                subtotal
+                quantity
             });
         }
 
@@ -329,7 +313,7 @@ const createOrder = async (req, res) => {
                     supplierId: supplierId,
                     order_number: generateOrderNumber(),
                     status: "Pending",
-                    total_amount: total_amount,
+                    total_amount: 0,
                     shipping_address: shipping_address,
                     notes: notes || null,
                     orderItems: {
