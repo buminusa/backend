@@ -597,6 +597,7 @@ const deleteProductImage = async (req, res) => {
 
 module.exports = {
   getAllProducts,
+  getMyProducts,
   getProductById,
   getProductBySlug,
   getPopularProducts,
