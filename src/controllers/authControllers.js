@@ -233,6 +233,11 @@ const login = async (req, res) => {
         const user = await prisma.users.findUnique({
             where: {
                 email: email
+            },
+            include: {
+                buyerProfiles: true,
+                companyProfiles: true,
+                role: true
             }
         });
 
@@ -253,9 +258,18 @@ const login = async (req, res) => {
             });
         }
 
+        const profileName = user.buyerProfiles?.full_name || user.companyProfiles?.company_name || user.email;
+
         // generate token
         const token = jwt.sign(
             { userId: user.id, email: user.email, roleId: user.roleId, role: user.role },
+            {
+                userId: user.id,
+                email: user.email,
+                roleId: user.roleId,
+                role: user.role,
+                name: profileName
+            },
             process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
@@ -276,9 +290,26 @@ const login = async (req, res) => {
     }
 }
 
+const logout = async (req, res) => {
+    try {
+        return res.status(200).json({
+            success: true,
+            message: "Logout successful"
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
 
 module.exports = {
     registerCompany,
     registerBuyer,
-    login
+    login,
+    logout
 }

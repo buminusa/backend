@@ -120,7 +120,6 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason);
-  shutdown('unhandledRejection');
 });
 
 module.exports = app;

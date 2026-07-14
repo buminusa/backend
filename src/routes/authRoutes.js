@@ -14,4 +14,7 @@ router.post("/register-buyer", authController.registerBuyer);
 
 // login
 router.post("/login", authController.login);
+
+router.post("/logout", authenticate, authController.logout);
+
 module.exports = router;

@@ -16,6 +16,67 @@ const productInclude = {
 };
 
 
+// get my products (supplier only)
+const getMyProducts = async (req, res) => {
+  try {
+    const { status, categoryId, search } = req.query;
+
+    const companyProfile = await prisma.companyProfiles.findUnique({
+      where: { userId: req.user.id },
+    });
+
+    if (!companyProfile) {
+      return res.status(403).json({
+        success: false,
+        message: "Hanya supplier yang dapat melihat produk miliknya.",
+      });
+    }
+
+    const where = {
+      supplierId: companyProfile.id,
+      ...(status ? { status } : {}),
+      ...(categoryId ? { categoryId: Number(categoryId) } : {}),
+      ...(search
+        ? {
+            OR: [
+              { nama: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
+    const products = await prisma.product.findMany({
+      where,
+      include: {
+        category: true,
+        supplier: {
+          select: {
+            id: true,
+            company_name: true,
+            slug: true,
+          },
+        },
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "List produk supplier berhasil diambil.",
+      data: products,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
 // get all product
 const getAllProducts = async (req, res) => {
   try {
