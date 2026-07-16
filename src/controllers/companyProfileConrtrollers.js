@@ -1,30 +1,42 @@
 const prisma = require("../config/prisma");
 
-// get company profile mengggunakan id user
+// get company profile menggunakan id user
 const getCompanyProfile = async (req, res) => {
     try {
-
         const { id } = req.params;
 
         const companyProfile = await prisma.companyProfiles.findUnique({
             where: {
                 userId: parseInt(id)
             },
-            include: {
+            select: {
+                id: true,
+                company_name: true,
+                slug: true,
+                npwp: true,
+                address: true,
+                province: true,
+                country: true,
+                phone: true,
+                logo_url: true,
+                business_description: true,
+                verificationStatus: true,
+                createdAt: true,
+                updatedAt: true,
+
                 user: {
                     select: {
                         id: true,
                         email: true,
-                        role:
-                        {
-                            select:
-                            {
+                        role: {
+                            select: {
                                 id: true,
                                 name_role: true
                             }
                         }
                     }
                 },
+
                 products: {
                     select: {
                         id: true,
@@ -44,19 +56,21 @@ const getCompanyProfile = async (req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             data: companyProfile
         });
+
     } catch (error) {
         console.error(error);
-        res.status(500).json({
+
+        return res.status(500).json({
             success: false,
             message: "Internal server error",
             error: error.message
         });
     }
-}
+};
 
 // get all company profiles (admin)
 const getAllCompanyProfiles = async (req, res) => {
