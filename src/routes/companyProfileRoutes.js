@@ -5,7 +5,7 @@ const { authenticate, authorize } = require("../middlewares/authMiddleware");
 const { uploadLogo } = require("../config/cloudinary"); 
 
 // get all company profiles
-router.get("/",authenticate, authorize("Admin"), companyProfileControllers.getAllCompanyProfiles);
+router.get("/",authenticate, authorize("Admin", "Super_Admin"), companyProfileControllers.getAllCompanyProfiles);
 
 // get company profile by user id
 router.get("/:id", authenticate, companyProfileControllers.getCompanyProfile);
@@ -17,6 +17,6 @@ router.put("/:id", authenticate, authorize("Supplier"), companyProfileController
 router.put("/:id/logo", authenticate, authorize("Supplier"), uploadLogo.single("logo"), companyProfileControllers.updateLogo);
 
 // update verification status (admin only)
-router.patch("/:id/verification-status", authenticate, authorize("Admin"), companyProfileControllers.updateVerificationStatus);
+router.patch("/:id/verification-status", authenticate, authorize("Admin", "Super_Admin"), companyProfileControllers.updateVerificationStatus);
 
 module.exports = router;

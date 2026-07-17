@@ -4,7 +4,7 @@ const orderControllers = require("../controllers/orderControllers");
 const { authenticate, authorize } = require("../middlewares/authMiddleware");
 
 // get all orders (admin)
-router.get("/", authenticate, authorize("Admin"), orderControllers.getAllOrders);
+router.get("/", authenticate, authorize("Admin", "Super_Admin"), orderControllers.getAllOrders);
 
 // get order milik buyer yang login
 router.get("/buyer/my-orders", authenticate, authorize("Buyer"), orderControllers.getMyOrdersBuyer);
@@ -25,6 +25,6 @@ router.patch("/:id/status", authenticate, authorize("Supplier", "Admin"), orderC
 router.patch("/:id/cancel", authenticate, authorize("Buyer"), orderControllers.cancelOrder);
 
 // admin hapus order permanen
-router.delete("/:id", authenticate, authorize("Admin"), orderControllers.deleteOrder);
+router.delete("/:id", authenticate, authorize("Admin", "Super_Admin"), orderControllers.deleteOrder);
 
 module.exports = router;

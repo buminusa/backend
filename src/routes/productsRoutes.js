@@ -36,7 +36,7 @@ router.put(
 router.patch(
   "/:id/status",
   authenticate,
-  authorize("Admin"),
+  authorize("Admin", "Super_Admin"),
   productController.updateProductStatus
 );
 
