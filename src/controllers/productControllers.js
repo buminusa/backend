@@ -83,8 +83,10 @@ const getAllProducts = async (req, res) => {
     const { page = 1, limit = 10, status, categoryId, supplierId, hs_code, search } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    const isAdmin = ["Admin", "Super_Admin"].includes(req.user.role?.name_role);
+
     const where = {
-      ...(status ? { status } : { status: "Active" }),
+      ...(status ? { status } : (!isAdmin ? { status: "Active" } : {})),
       ...(categoryId ? { categoryId: Number(categoryId) } : {}),
       ...(supplierId ? { supplierId: Number(supplierId) } : {}),
       ...(hs_code ? { hs_code } : {}),
@@ -269,23 +271,44 @@ const createProduct = async (req, res) => {
       });
     }
 
-    const companyProfile = await prisma.companyProfiles.findUnique({
-      where: { userId: req.user.id },
-    });
+    const isSuperAdmin = req.user.role?.name_role === "Super_Admin";
+    const { supplierId: requestedSupplierId } = req.body;
 
-    if (!companyProfile) {
-      return res.status(403).json({
-        success: false,
-        message: "Hanya supplier yang dapat menambahkan produk.",
+    let supplierId = null;
+
+    if (isSuperAdmin) {
+      if (requestedSupplierId) {
+        const supplierProfile = await prisma.companyProfiles.findUnique({
+          where: { id: Number(requestedSupplierId) },
+        });
+        if (!supplierProfile) {
+          return res.status(404).json({
+            success: false,
+            message: "Supplier tidak ditemukan.",
+          });
+        }
+        supplierId = supplierProfile.id;
+      }
+    } else {
+      const companyProfile = await prisma.companyProfiles.findUnique({
+        where: { userId: req.user.id },
       });
+
+      if (!companyProfile) {
+        return res.status(403).json({
+          success: false,
+          message: "Hanya supplier yang dapat menambahkan produk.",
+        });
+      }
+      supplierId = companyProfile.id;
     }
 
     const finalSlug = await generateUniqueSlug(prisma.product, nama);
 
     const product = await prisma.product.create({
       data: {
-        supplierId: companyProfile.id,
-        categoryId: categoryId ? Number(categoryId) : null,
+        ...(supplierId ? { supplier: { connect: { id: supplierId } } } : {}),
+        ...(categoryId ? { category: { connect: { id: Number(categoryId) } } } : {}),
         nama,
         description: description || null,
         spectification: spectification || null,
@@ -398,7 +421,7 @@ const updateProduct = async (req, res) => {
       ...(price_max !== undefined ? { price_max: Number(price_max) } : {}),
       ...(unit !== undefined ? { unit: unit || null } : {}),
       ...(hs_code !== undefined ? { hs_code: hs_code || null } : {}),
-      ...(categoryId ? { categoryId: Number(categoryId) } : {}),
+      ...(categoryId ? { category: { connect: { id: Number(categoryId) } } } : {}),
     };
 
     if (nama && nama !== existingProduct.nama) {
@@ -452,7 +475,7 @@ const updateProductStatus = async (req, res) => {
     const productId = Number(req.params.id);
     const { status } = req.body;
 
-    const allowedStatus = ["Active", "Rejected"];
+    const allowedStatus = ["Active", "Pending", "Rejected", "Draft"];
     if (!status || !allowedStatus.includes(status)) {
       return res.status(400).json({
         success: false,
@@ -497,36 +520,51 @@ const updateProductStatus = async (req, res) => {
 const deleteProduct = async (req, res) => {
   try {
     const productId = Number(req.params.id);
+    const isSuperAdmin = req.user.role?.name_role === "Super_Admin";
 
-    const companyProfile = await prisma.companyProfiles.findUnique({
-      where: { userId: req.user.id },
-    });
-
-    if (!companyProfile) {
-      return res.status(403).json({
-        success: false,
-        message: "Hanya supplier yang dapat menghapus produk.",
+    if (!isSuperAdmin) {
+      const companyProfile = await prisma.companyProfiles.findUnique({
+        where: { userId: req.user.id },
       });
+
+      if (!companyProfile) {
+        return res.status(403).json({
+          success: false,
+          message: "Hanya supplier yang dapat menghapus produk.",
+        });
+      }
+
+      const existingProduct = await prisma.product.findUnique({
+        where: { id: productId },
+      });
+
+      if (!existingProduct) {
+        return res.status(404).json({
+          success: false,
+          message: "Produk tidak ditemukan.",
+        });
+      }
+
+      if (existingProduct.supplierId !== companyProfile.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Anda tidak memiliki izin untuk menghapus produk ini.",
+        });
+      }
+    } else {
+      const existingProduct = await prisma.product.findUnique({
+        where: { id: productId },
+      });
+
+      if (!existingProduct) {
+        return res.status(404).json({
+          success: false,
+          message: "Produk tidak ditemukan.",
+        });
+      }
     }
 
-    const existingProduct = await prisma.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!existingProduct) {
-      return res.status(404).json({
-        success: false,
-        message: "Produk tidak ditemukan.",
-      });
-    }
-
-    if (existingProduct.supplierId !== companyProfile.id) {
-      return res.status(403).json({
-        success: false,
-        message: "Anda tidak memiliki izin untuk menghapus produk ini.",
-      });
-    }
-
+    await prisma.productImages.deleteMany({ where: { productId } });
     await prisma.product.delete({ where: { id: productId } });
 
     return res.status(200).json({

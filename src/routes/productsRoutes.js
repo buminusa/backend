@@ -12,11 +12,11 @@ router.get("/slug/:slug", authenticate, productController.getProductBySlug);
 router.get("/popular", authenticate, productController.getPopularProducts);
 router.get("/:id", authenticate, productController.getProductById);
 
-// crate product
+// create product
 router.post(
   "/",
   authenticate,
-  authorize("Supplier"),
+  authorize("Supplier", "Super_Admin"),
   uploadProduct.array("images", 5),
   handleUploadError,
   productController.createProduct
