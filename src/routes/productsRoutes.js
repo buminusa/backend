@@ -32,14 +32,6 @@ router.put(
   productController.updateProduct
 );
 
-// update product status (admin only)
-router.patch(
-  "/:id/status",
-  authenticate,
-  authorize("Admin", "Super_Admin"),
-  productController.updateProductStatus
-);
-
 // delete product
 router.delete("/:id", authenticate, authorize("Supplier", "Super_Admin"), productController.deleteProduct);
 

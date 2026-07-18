@@ -19,7 +19,7 @@ const productInclude = {
 // get my products (supplier only)
 const getMyProducts = async (req, res) => {
   try {
-    const { status, categoryId, search } = req.query;
+    const { categoryId, search } = req.query;
 
     const companyProfile = await prisma.companyProfiles.findUnique({
       where: { userId: req.user.id },
@@ -34,7 +34,6 @@ const getMyProducts = async (req, res) => {
 
     const where = {
       supplierId: companyProfile.id,
-      ...(status ? { status } : {}),
       ...(categoryId ? { categoryId: Number(categoryId) } : {}),
       ...(search
         ? {
@@ -80,13 +79,10 @@ const getMyProducts = async (req, res) => {
 // get all product
 const getAllProducts = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status, categoryId, supplierId, hs_code, search } = req.query;
+    const { page = 1, limit = 10, categoryId, supplierId, hs_code, search } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const isAdmin = ["Admin", "Super_Admin"].includes(req.user.role?.name_role);
-
     const where = {
-      ...(status ? { status } : (!isAdmin ? { status: "Active" } : {})),
       ...(categoryId ? { categoryId: Number(categoryId) } : {}),
       ...(supplierId ? { supplierId: Number(supplierId) } : {}),
       ...(hs_code ? { hs_code } : {}),
@@ -205,7 +201,6 @@ const getPopularProducts = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const where = {
-      status: "Active",
       ...(categoryId ? { categoryId: Number(categoryId) } : {}),
     };
 
@@ -318,7 +313,6 @@ const createProduct = async (req, res) => {
         unit: unit || null,
         hs_code: hs_code || null,
         slug: finalSlug,
-        status: "Pending",
       },
     });
 
@@ -428,9 +422,6 @@ const updateProduct = async (req, res) => {
       data.slug = await generateUniqueSlug(prisma.product, nama, existingProduct.id);
     }
 
-    // Re-submit for review after supplier edits.
-    data.status = "Pending";
-
     const updatedProduct = await prisma.product.update({
       where: { id: productId },
       data,
@@ -469,53 +460,7 @@ const updateProduct = async (req, res) => {
   }
 };
 
-// update product status (admin only)
-const updateProductStatus = async (req, res) => {
-  try {
-    const productId = Number(req.params.id);
-    const { status } = req.body;
-
-    const allowedStatus = ["Active", "Pending", "Rejected", "Draft"];
-    if (!status || !allowedStatus.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Status harus salah satu dari: ${allowedStatus.join(", ")}.`,
-      });
-    }
-
-    const existingProduct = await prisma.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!existingProduct) {
-      return res.status(404).json({
-        success: false,
-        message: "Produk tidak ditemukan.",
-      });
-    }
-
-    const updatedProduct = await prisma.product.update({
-      where: { id: productId },
-      data: { status },
-      include: productInclude,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Status produk berhasil diubah menjadi ${status}.`,
-      data: updatedProduct,
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      error: error.message,
-    });
-  }
-};
-
-// delete product 
+// delete product
 
 const deleteProduct = async (req, res) => {
   try {
@@ -641,7 +586,6 @@ module.exports = {
   getPopularProducts,
   createProduct,
   updateProduct,
-  updateProductStatus,
   deleteProduct,
   deleteProductImage,
 };

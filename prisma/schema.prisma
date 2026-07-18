@@ -13,13 +13,6 @@ enum VerificationStatus {
   Rejected
 }
 
-enum ProductStatus {
-  Draft
-  Pending
-  Active
-  Rejected
-}
-
 enum OrderStatus {
   Pending
   Confirmed
@@ -128,7 +121,6 @@ model Product {
   hs_code        String?       @db.VarChar(50)
   views          Int           @default(0)
   slug           String?       @unique @db.VarChar(255)
-  status         ProductStatus @default(Pending)
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
@@ -140,7 +132,6 @@ model Product {
   @@index([supplierId], map: "idx_product_supplier_id")
   @@index([categoryId], map: "idx_product_category_id")
   @@index([slug], map: "idx_product_slug")
-  @@index([status], map: "idx_product_status")
   @@index([hs_code], map: "idx_product_hs_code")
   @@index([views(sort: Desc)], map: "idx_product_views")
   @@map("product")

@@ -269,14 +269,6 @@ const createOrder = async (req, res) => {
             });
         }
 
-        const inactiveProduct = products.find((p) => p.status !== "Active");
-        if (inactiveProduct) {
-            return res.status(400).json({
-                success: false,
-                message: `Product "${inactiveProduct.nama}" tidak tersedia untuk dipesan`
-            });
-        }
-
         const supplierIds = [...new Set(products.map((p) => p.supplierId))];
         if (supplierIds.length > 1) {
             return res.status(400).json({
