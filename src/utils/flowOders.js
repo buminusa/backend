@@ -17,7 +17,8 @@ const ROLE_ALLOWED_TRANSITIONS = {
         Confirmed: ["Processing", "Cancelled"],
         Processing: ["Shipped"]
     },
-    Admin: STATUS_FLOW
+    Admin: STATUS_FLOW,
+    Super_Admin: STATUS_FLOW
 };
 
 module.exports = {

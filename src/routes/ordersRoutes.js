@@ -13,13 +13,13 @@ router.get("/buyer/my-orders", authenticate, authorize("Buyer"), orderController
 router.get("/supplier/my-orders", authenticate, authorize("Supplier"), orderControllers.getMyOrdersSupplier);
 
 // get detail order by id
-router.get("/:id", authenticate, authorize("Buyer", "Supplier", "Admin"), orderControllers.getOrderById);
+router.get("/:id", authenticate, authorize("Buyer", "Supplier", "Admin", "Super_Admin"), orderControllers.getOrderById);
 
 // buyer create order
 router.post("/", authenticate, authorize("Buyer"), orderControllers.createOrder);
 
-// supplier/admin update status order
-router.patch("/:id/status", authenticate, authorize("Supplier", "Admin"), orderControllers.updateOrderStatus);
+// supplier/admin/super_admin update status order
+router.patch("/:id/status", authenticate, authorize("Supplier", "Admin", "Super_Admin"), orderControllers.updateOrderStatus);
 
 // buyer cancel order milik sendiri
 router.patch("/:id/cancel", authenticate, authorize("Buyer"), orderControllers.cancelOrder);
