@@ -2,15 +2,13 @@ const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-
-
 // register for company
 const registerCompany = async (req, res) => {
     try {
         const { email, password, company_name, address, province, country, phone, business_description } = req.body;
 
-        const npwp = req.files?.npwp?.[0]?.path;
-        const logo = req.files?.logo?.[0]?.path;
+        // const npwp = req.files?.npwp?.[0]?.path;
+        // const logo = req.files?.logo?.[0]?.path;
 
         // field validation
         if (!email || !password || !company_name || !address || !province || !country || !phone || !business_description) {
@@ -20,12 +18,12 @@ const registerCompany = async (req, res) => {
             })
         };
 
-        if (!npwp) {
-            return res.status(400).json({
-                success: false,
-                message: "Please upload your NPWP file"
-            })
-        }
+        // if (!npwp) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Please upload your NPWP file"
+        //     })
+        // }
 
         // cek email sudah terdaftar atau belum
         const existingUser = await prisma.users.findUnique({
@@ -101,12 +99,12 @@ const registerCompany = async (req, res) => {
                     userId: user.id,
                     company_name: company_name,
                     slug: finalSlug,
-                    npwp: npwp,
+                    // npwp: npwp,
                     address: address,
                     province: province,
                     country: country,
                     phone: phone,
-                    logo_url: logo,
+                    // logo_url: logo,
                     business_description: business_description,
                 }
             });
