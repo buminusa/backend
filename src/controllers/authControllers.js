@@ -2,35 +2,34 @@ const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-
-
 // register for company
 const registerCompany = async (req, res) => {
     try {
         const { email, password, company_name, address, province, country, phone, business_description } = req.body;
+        const normalizedEmail = email?.toLowerCase().trim();
 
-        const npwp = req.files?.npwp?.[0]?.path;
-        const logo = req.files?.logo?.[0]?.path;
+        // const npwp = req.files?.npwp?.[0]?.path;
+        // const logo = req.files?.logo?.[0]?.path;
 
         // field validation
-        if (!email || !password || !company_name || !address || !province || !country || !phone || !business_description) {
+        if (!normalizedEmail || !password || !company_name || !address || !province || !country || !phone || !business_description) {
             return res.status(400).json({
                 success: false,
                 message: "Please fill all the fields"
             })
         };
 
-        if (!npwp) {
-            return res.status(400).json({
-                success: false,
-                message: "Please upload your NPWP file"
-            })
-        }
+        // if (!npwp) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Please upload your NPWP file"
+        //     })
+        // }
 
         // cek email sudah terdaftar atau belum
         const existingUser = await prisma.users.findUnique({
             where: {
-                email: email
+                email: normalizedEmail
             }
         });
 
@@ -60,37 +59,24 @@ const registerCompany = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // generate slug from company name
-        const slug = company_name
+        const baseSlug = company_name
             .toLowerCase()
             .replace(/[^a-z0-9\s-]/g, "")
             .trim()
             .replace(/\s+/g, "-");
 
-        // cek slug sudah ada atau belum
-        const existingSlug = await prisma.companyProfiles.findUnique({
-            where: {
-                slug: slug
-            }
+        // cek slug sudah ada atau belum, kalau ada tambahkan timestamp biar tetap unik
+        const existingSlug = await prisma.companyProfiles.findFirst({
+            where: { slug: baseSlug }
         });
 
-        if (existingSlug) {
-            return res.status(400).json({
-                success: false,
-                message: "Company name already exists"
-            })
-        }
-
-        const finalSlug = await prisma.companyProfiles.findFirst({
-            where: { slug }
-        })
-            ? `${slug}-${Date.now()}`
-            : slug;
+        const finalSlug = existingSlug ? `${baseSlug}-${Date.now()}` : baseSlug;
 
         // create user + company profile dalam satu transaksi
         const result = await prisma.$transaction(async (tx) => {
             const user = await tx.users.create({
                 data: {
-                    email: email,
+                    email: normalizedEmail,
                     password: hashedPassword,
                     roleId: roleExisting.id
                 }
@@ -101,12 +87,12 @@ const registerCompany = async (req, res) => {
                     userId: user.id,
                     company_name: company_name,
                     slug: finalSlug,
-                    npwp: npwp,
+                    // npwp: npwp,
                     address: address,
                     province: province,
                     country: country,
                     phone: phone,
-                    logo_url: logo,
+                    // logo_url: logo,
                     business_description: business_description,
                 }
             });
@@ -140,9 +126,10 @@ const registerCompany = async (req, res) => {
 const registerBuyer = async (req, res) => {
     try {
         const { email, password, full_name, address, province, country, phone } = req.body;
+        const normalizedEmail = email?.toLowerCase().trim();
 
         // field validation
-        if (!email || !password || !full_name || !address || !province || !country || !phone) {
+        if (!normalizedEmail || !password || !full_name || !address || !province || !country || !phone) {
             return res.status(400).json({
                 success: false,
                 message: "Please fill all the fields"
@@ -152,7 +139,7 @@ const registerBuyer = async (req, res) => {
         // cek email sudah terdaftar atau belum
         const existingUser = await prisma.users.findUnique({
             where: {
-                email: email
+                email: normalizedEmail
             }
         });
 
@@ -186,7 +173,7 @@ const registerBuyer = async (req, res) => {
         const result = await prisma.$transaction(async (tx) => {
             const user = await tx.users.create({
                 data: {
-                    email: email,
+                    email: normalizedEmail,
                     password: hashedPassword,
                     roleId: roleExisting.id
                 }
@@ -228,11 +215,19 @@ const registerBuyer = async (req, res) => {
 const login = async (req, res) => {
     try {
         const { email, password } = req.body;
+        const normalizedEmail = email?.toLowerCase().trim();
+
+        if (!normalizedEmail || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Please fill all the fields"
+            });
+        }
 
         // cek email
         const user = await prisma.users.findUnique({
             where: {
-                email: email
+                email: normalizedEmail
             },
             include: {
                 buyerProfiles: true,
@@ -266,7 +261,7 @@ const login = async (req, res) => {
                 userId: user.id,
                 email: user.email,
                 roleId: user.roleId,
-                role: user.role,
+                role: user.role.name_role,
                 name: profileName
             },
             process.env.JWT_SECRET,
@@ -308,9 +303,54 @@ const logout = async (req, res) => {
 }
 
 
+const me = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        const user = await prisma.users.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                createdAt: true,
+                role: {
+                    select: {
+                        id: true,
+                        name_role: true
+                    }
+                },
+                buyerProfiles: true,
+                companyProfiles: true
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "User fetched successfully",
+            data: user
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
+
 module.exports = {
     registerCompany,
     registerBuyer,
     login,
-    logout
+    logout,
+    me
 }
