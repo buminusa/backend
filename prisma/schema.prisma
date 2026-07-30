@@ -73,7 +73,7 @@ model CompanyProfiles {
   userId               Int?               @unique @map("user_id")
   company_name         String             @db.VarChar(255)
   slug                 String             @unique @db.VarChar(255)
-  npwp                 String             @db.Text
+  npwp                 String?            @db.Text
   address              String             @db.Text
   province             String             @db.VarChar(100)
   country              String             @db.VarChar(100)
