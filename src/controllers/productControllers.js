@@ -10,10 +10,11 @@ const productInclude = {
       company_name: true,
       slug: true,
       logo_url: true,
+      address: true,
     },
   },
   images: true,
-};
+}
 
 
 // get my products (supplier only)
@@ -54,6 +55,7 @@ const getMyProducts = async (req, res) => {
             id: true,
             company_name: true,
             slug: true,
+             address: true,
           },
         },
         images: true,
