@@ -38,11 +38,11 @@ const getMyProducts = async (req, res) => {
       ...(categoryId ? { categoryId: Number(categoryId) } : {}),
       ...(search
         ? {
-            OR: [
-              { nama: { contains: search, mode: "insensitive" } },
-              { description: { contains: search, mode: "insensitive" } },
-            ],
-          }
+          OR: [
+            { nama: { contains: search, mode: "insensitive" } },
+            { description: { contains: search, mode: "insensitive" } },
+          ],
+        }
         : {}),
     };
 
@@ -55,7 +55,7 @@ const getMyProducts = async (req, res) => {
             id: true,
             company_name: true,
             slug: true,
-             address: true,
+            address: true,
           },
         },
         images: true,
@@ -254,17 +254,35 @@ const createProduct = async (req, res) => {
       categoryId,
     } = req.body;
 
-    if (!nama || !min_order || price_min === undefined || price_max === undefined) {
+    if (!nama || price_min === undefined || price_max === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Nama produk, minimal order, price_min, dan price_max wajib diisi.",
+        message: "Nama produk, price_min, dan price_max wajib diisi.",
       });
     }
 
-    if (Number(price_min) > Number(price_max)) {
+    const priceMinNum = Number(price_min);
+    const priceMaxNum = Number(price_max);
+
+    if (isNaN(priceMinNum) || isNaN(priceMaxNum)) {
+      return res.status(400).json({
+        success: false,
+        message: "price_min dan price_max harus berupa angka.",
+      });
+    }
+
+    if (priceMinNum > priceMaxNum) {
       return res.status(400).json({
         success: false,
         message: "price_min tidak boleh lebih besar dari price_max.",
+      });
+    }
+
+    // minimal order 100kg 
+    if (min_order === undefined || min_order === null || min_order === "" || Number(min_order) < 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Minimal order harus lebih besar atau sama dengan 100kg.",
       });
     }
 
@@ -310,8 +328,8 @@ const createProduct = async (req, res) => {
         description: description || null,
         spectification: spectification || null,
         min_order: Number(min_order),
-        price_min: Number(price_min),
-        price_max: Number(price_max),
+        price_min: priceMinNum,
+        price_max: priceMaxNum,
         unit: unit || null,
         hs_code: hs_code || null,
         slug: finalSlug,
@@ -380,6 +398,14 @@ const updateProduct = async (req, res) => {
       });
     }
 
+    // minimal order 100kg
+    if (min_order !== undefined && min_order !== null && min_order !== "" && Number(min_order) < 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Minimal order harus lebih besar atau sama dengan 100kg.",
+      });
+    }
+
     const existingProduct = await prisma.product.findUnique({
       where: { id: productId },
     });
@@ -401,6 +427,14 @@ const updateProduct = async (req, res) => {
     // Validate price range if either value is being updated
     const nextPriceMin = price_min !== undefined ? Number(price_min) : Number(existingProduct.price_min);
     const nextPriceMax = price_max !== undefined ? Number(price_max) : Number(existingProduct.price_max);
+
+    if (isNaN(nextPriceMin) || isNaN(nextPriceMax)) {
+      return res.status(400).json({
+        success: false,
+        message: "price_min dan price_max harus berupa angka.",
+      });
+    }
+
     if (nextPriceMin > nextPriceMax) {
       return res.status(400).json({
         success: false,
