@@ -135,17 +135,23 @@ const getProductById = async (req, res) => {
   try {
     const productId = Number(req.params.id);
 
-    const product = await prisma.product.findUnique({
+    const existingProduct = await prisma.product.findUnique({
       where: { id: productId },
       include: productInclude,
     });
 
-    if (!product) {
+    if (!existingProduct) {
       return res.status(404).json({
         success: false,
         message: "Produk tidak ditemukan.",
       });
     }
+
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: { views: { increment: 1 } },
+      include: productInclude,
+    });
 
     return res.status(200).json({
       success: true,
@@ -168,17 +174,23 @@ const getProductBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const product = await prisma.product.findUnique({
+    const existingProduct = await prisma.product.findUnique({
       where: { slug },
-      include: productInclude,
+      select: { id: true },
     });
 
-    if (!product) {
+    if (!existingProduct) {
       return res.status(404).json({
         success: false,
         message: "Produk tidak ditemukan.",
       });
     }
+
+    const product = await prisma.product.update({
+      where: { id: existingProduct.id },
+      data: { views: { increment: 1 } },
+      include: productInclude,
+    });
 
     return res.status(200).json({
       success: true,
