@@ -23,30 +23,34 @@ be_bumi_nusa/
 │   └── migrations/            # Riwayat migrasi
 ├── prisma.config.ts           # Konfigurasi Prisma (path schema & migrations)
 ├── src/
-│   ├── config/
-│   │   ├── database.js        # Koneksi pool `pg` (native)
-│   │   ├── prisma.js          # Prisma Client (adapter-pg)
-│   │   └── cloudinary.js      # Konfigurasi Cloudinary & multer storage
-│   ├── controllers/
-│   │   ├── authControllers.js
-│   │   ├── usersControllers.js
-│   │   ├── companyProfileConrtrollers.js
-│   │   ├── buyerControllers.js
-│   │   ├── productControllers.js
-│   │   └── categoriesControllers.js
-│   ├── middlewares/
-│   │   ├── authMiddleware.js  # `authenticate` & `authorize`
-│   │   └── uploadMiddleware.js
-│   ├── routes/
-│   │   ├── index.js
-│   │   ├── authRoutes.js
-│   │   ├── usersRoutes.js
-│   │   ├── companyProfileRoutes.js
-│   │   ├── buyerRoutes.js
-│   │   ├── productsRoutes.js
-│   │   └── categoriesRoutes.js
-│   └── utils/
-│       └── slug.js
+  │   ├── config/
+  │   │   ├── database.js        # Koneksi pool `pg` (native)
+  │   │   ├── prisma.js          # Prisma Client (adapter-pg)
+  │   │   └── cloudinary.js      # Konfigurasi Cloudinary & multer storage
+  │   ├── controllers/
+  │   │   ├── authControllers.js
+  │   │   ├── usersControllers.js
+  │   │   ├── companyProfileConrtrollers.js
+  │   │   ├── buyerControllers.js
+  │   │   ├── productControllers.js
+  │   │   ├── categoriesControllers.js
+  │   │   └── orderControllers.js
+  │   ├── middlewares/
+  │   │   ├── authMiddleware.js  # `authenticate` & `authorize`
+  │   │   └── uploadMiddleware.js
+  │   ├── routes/
+  │   │   ├── index.js
+  │   │   ├── authRoutes.js
+  │   │   ├── usersRoutes.js
+  │   │   ├── companyProfileRoutes.js
+  │   │   ├── buyerRoutes.js
+  │   │   ├── productsRoutes.js
+  │   │   ├── categoriesRoutes.js
+  │   │   └── ordersRoutes.js
+  │   └── utils/
+  │       ├── slug.js
+  │       ├── generateNumberOrders.js
+  │       └── flowOders.js
 ├── views/                     # Jade views (default express-generator)
 └── .github/workflows/
     └── telegram.yml           # Notifikasi Telegram tiap push/PR/release
@@ -61,8 +65,10 @@ be_bumi_nusa/
 | `CompanyProfiles` | Profil supplier (nama perusahaan, NPWP, logo, status verifikasi) |
 | `BuyerProfiles` | Profil pembeli |
 | `Categories` | Kategori produk |
-| `Product` | Produk milik supplier, punya status (`Draft`, `Pending`, `Active`, `Rejected`) dan views |
+| `Product` | Produk milik supplier (harga min/max, min_order, unit, HS code, views, slug) |
 | `ProductImages` | Gambar produk (relasi 1-N ke `Product`) |
+| `Orders` | Order dari buyer ke supplier, punya status (`Pending`, `Confirmed`, `Processing`, `Shipped`, `Completed`, `Cancelled`) |
+| `OrderItems` | Baris item dalam order (relasi N-1 ke `Orders` dan `Product`) |
 
 ## API Endpoints
 
@@ -124,6 +130,20 @@ Base URL: `/api/v1`
 | POST | `/` | Tambah kategori |
 | PUT | `/:id` | Update kategori |
 | DELETE | `/:id` | Hapus kategori |
+
+### Orders (`/orders`)
+| Method | Endpoint | Akses | Deskripsi |
+|---|---|---|---|
+| GET | `/` | Admin, Super_Admin | List semua order (filter `status`, `buyerId`, `supplierId`, `search`, `page`, `limit`) |
+| GET | `/buyer/my-orders` | Buyer | List order milik buyer yang login |
+| GET | `/supplier/my-orders` | Supplier | List order masuk ke supplier yang login |
+| GET | `/:id` | Auth (ownership) | Detail order by id |
+| POST | `/` | Buyer | Buat order (1 order = 1 supplier, validasi min_order) |
+| PATCH | `/:id/status` | Admin, Super_Admin | Update status order (ikuti alur status) |
+| PATCH | `/:id/cancel` | Buyer | Batalkan order milik sendiri |
+| DELETE | `/:id` | Admin, Super_Admin | Hapus order permanen |
+
+Alur status order: `Pending -> Confirmed -> Processing -> Shipped -> Completed`, dengan `Cancelled` tersedia dari `Pending`/`Confirmed` (buyer hanya bisa cancel saat `Pending`).
 
 ### Lainnya
 | Method | Endpoint | Deskripsi |

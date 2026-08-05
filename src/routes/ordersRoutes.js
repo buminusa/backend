@@ -19,7 +19,7 @@ router.get("/:id", authenticate, authorize("Buyer", "Supplier", "Admin", "Super_
 router.post("/", authenticate, authorize("Buyer"), orderControllers.createOrder);
 
 // supplier/admin/super_admin update status order
-router.patch("/:id/status", authenticate, authorize("Supplier", "Admin", "Super_Admin"), orderControllers.updateOrderStatus);
+router.patch("/:id/status", authenticate, authorize("Admin", "Super_Admin"), orderControllers.updateOrderStatus);
 
 // buyer cancel order milik sendiri
 router.patch("/:id/cancel", authenticate, authorize("Buyer"), orderControllers.cancelOrder);
