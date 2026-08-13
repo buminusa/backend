@@ -1,6 +1,7 @@
 const prisma = require("../config/prisma");
 const generateOrderNumber = require("../utils/generateNumberOrders");
 const { STATUS_FLOW, ROLE_ALLOWED_TRANSITIONS } = require("../utils/flowOders");
+const { queueOrderEmails } = require("../utils/mailer");
 
 const orderIncludeDetail = {
     buyer: {
@@ -323,6 +324,12 @@ const createOrder = async (req, res) => {
             message: "Order berhasil dibuat",
             data: result
         });
+
+        try {
+            queueOrderEmails(result, req.user.email);
+        } catch (error) {
+            console.error("[MAILQUEUE] Gagal mengantrekan email:", error.message || error);
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({

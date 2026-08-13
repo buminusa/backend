@@ -1,6 +1,8 @@
 const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { generateVerificationToken, generateResetToken, verifyToken } = require("../utils/tokenUtils");
+const { queueVerificationEmail, queueResetPasswordEmail } = require("../utils/mailer");
 
 // register for company
 const registerCompany = async (req, res) => {
@@ -100,13 +102,22 @@ const registerCompany = async (req, res) => {
             return { user, companyProfile };
         });
 
+        // kirim email verifikasi (via queue, tidak memblokir response)
+        try {
+            const verificationToken = generateVerificationToken(result.user.id);
+            const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+            queueVerificationEmail(normalizedEmail, verifyUrl);
+        } catch (error) {
+            console.error("[AUTH] Gagal mengirim email verifikasi:", error.message || error);
+        }
 
         return res.status(201).json({
             success: true,
-            message: "User registered successfully",
+            message: "User registered successfully. Silakan verifikasi email melalui link yang dikirim ke email Anda",
             data: {
                 userId: result.user.id,
                 email: result.user.email,
+                verified: false,
                 companyProfile: result.companyProfile,
             }
         });
@@ -191,12 +202,22 @@ const registerBuyer = async (req, res) => {
             return { user, buyerProfile };
         })
 
+        // kirim email verifikasi (via queue, tidak memblokir response)
+        try {
+            const verificationToken = generateVerificationToken(result.user.id);
+            const verifyUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+            queueVerificationEmail(normalizedEmail, verifyUrl);
+        } catch (error) {
+            console.error("[AUTH] Gagal mengirim email verifikasi:", error.message || error);
+        }
+
         return res.status(201).json({
             success: true,
-            message: "User registered successfully",
+            message: "User registered successfully. Silakan verifikasi email melalui link yang dikirim ke email Anda",
             data: {
                 userId: result.user.id,
                 email: result.user.email,
+                verified: false,
                 buyerProfile: result.buyerProfile,
             }
         });
@@ -270,10 +291,25 @@ const login = async (req, res) => {
             }
         );
 
+        if (!user.verified) {
+            return res.status(200).json({
+                success: true,
+                message: "Login berhasil, namun email belum diverifikasi",
+                token: token,
+                data: {
+                    verified: false,
+                    warning: "Email belum diverifikasi. Silakan verifikasi melalui email yang sudah dikirim ke Gmail Anda."
+                }
+            });
+        }
+
         return res.status(200).json({
             success: true,
             message: "Login successful",
-            token: token
+            token: token,
+            data: {
+                verified: true
+            }
         });
     }
     catch (error) {
@@ -347,10 +383,176 @@ const me = async (req, res) => {
 }
 
 
+// verifikasi email via link (GET ?token=...)
+const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.query;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: "Token verifikasi tidak ditemukan"
+            });
+        }
+
+        let decoded;
+        try {
+            decoded = verifyToken(token, "verify_email");
+        } catch (error) {
+            return res.status(400).json({
+                success: false,
+                message: "Token verifikasi tidak valid atau sudah kedaluwarsa"
+            });
+        }
+
+        const user = await prisma.users.findUnique({
+            where: { id: decoded.userId }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User tidak ditemukan"
+            });
+        }
+
+        if (user.verified) {
+            return res.status(200).json({
+                success: true,
+                message: "Email sudah diverifikasi sebelumnya"
+            });
+        }
+
+        await prisma.users.update({
+            where: { id: user.id },
+            data: { verified: true }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Email berhasil diverifikasi, akun Anda sudah aktif"
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
+// lupa password: kirim link reset ke email
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const normalizedEmail = email?.toLowerCase().trim();
+
+        if (!normalizedEmail) {
+            return res.status(400).json({
+                success: false,
+                message: "Email wajib diisi"
+            });
+        }
+
+        const user = await prisma.users.findUnique({
+            where: { email: normalizedEmail }
+        });
+
+        // anti user-enumeration: response tetap sama walau email tidak terdaftar
+        if (user) {
+            try {
+                const resetToken = generateResetToken(user.id, user.email);
+                const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+                queueResetPasswordEmail(user.email, resetUrl);
+            } catch (error) {
+                console.error("[AUTH] Gagal mengirim email reset password:", error.message || error);
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Jika email terdaftar, link reset password akan dikirim ke email Anda"
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
+// reset password dengan token dari email
+const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Token dan password baru wajib diisi"
+            });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: "Password minimal 6 karakter"
+            });
+        }
+
+        let decoded;
+        try {
+            decoded = verifyToken(token, "reset_password");
+        } catch (error) {
+            return res.status(400).json({
+                success: false,
+                message: "Token reset tidak valid atau sudah kedaluwarsa"
+            });
+        }
+
+        const user = await prisma.users.findUnique({
+            where: { id: decoded.userId }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User tidak ditemukan"
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await prisma.users.update({
+            where: { id: user.id },
+            data: { password: hashedPassword }
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Password berhasil direset, silakan login dengan password baru"
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
+
 module.exports = {
     registerCompany,
     registerBuyer,
     login,
     logout,
-    me
+    me,
+    verifyEmail,
+    forgotPassword,
+    resetPassword
 }

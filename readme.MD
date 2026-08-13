@@ -8,6 +8,7 @@ Backend REST API untuk **Bumi Nusa**, platform B2B yang mempertemukan supplier (
 - **ORM:** Prisma 7 (`@prisma/adapter-pg`) dengan PostgreSQL
 - **Auth:** JWT (`jsonwebtoken`) + `bcryptjs`
 - **Upload:** Multer + Cloudinary (`multer-storage-cloudinary`)
+- **Email:** Nodemailer (verifikasi email, reset password, notifikasi order)
 - **Security:** Helmet, CORS, `express-rate-limit`, Compression
 - **Logging:** Morgan
 - **CI/CD:** GitHub Actions (notifikasi Telegram untuk push, pull request, dan release)
@@ -48,9 +49,11 @@ be_bumi_nusa/
   │   │   ├── categoriesRoutes.js
   │   │   └── ordersRoutes.js
   │   └── utils/
-  │       ├── slug.js
-  │       ├── generateNumberOrders.js
-  │       └── flowOders.js
+│       ├── slug.js
+│       ├── generateNumberOrders.js
+│       ├── flowOders.js
+│       ├── tokenUtils.js    # generate/verify JWT untuk verifikasi & reset password
+│       └── mailer.js        # queue email via nodemailer
 ├── views/                     # Jade views (default express-generator)
 └── .github/workflows/
     └── telegram.yml           # Notifikasi Telegram tiap push/PR/release
@@ -61,7 +64,7 @@ be_bumi_nusa/
 | Model | Deskripsi |
 |---|---|
 | `Role` | Daftar role (Super_Admin, Admin, Supplier, Buyer, dst) |
-| `Users` | Akun user, terhubung ke `Role`, `CompanyProfiles`, `BuyerProfiles` |
+| `Users` | Akun user, terhubung ke `Role`, `CompanyProfiles`, `BuyerProfiles`; punya flag `verified` |
 | `CompanyProfiles` | Profil supplier (nama perusahaan, NPWP, logo, status verifikasi) |
 | `BuyerProfiles` | Profil pembeli |
 | `Categories` | Kategori produk |
@@ -77,9 +80,12 @@ Base URL: `/api/v1`
 ### Auth (`/auth`)
 | Method | Endpoint | Deskripsi |
 |---|---|---|
-| POST | `/register-company` | Registrasi supplier (upload NPWP + logo) |
-| POST | `/register-buyer` | Registrasi buyer |
-| POST | `/login` | Login, mengembalikan JWT |
+| POST | `/register-company` | Registrasi supplier (upload NPWP + logo) + kirim email verifikasi |
+| POST | `/register-buyer` | Registrasi buyer + kirim email verifikasi |
+| POST | `/login` | Login, mengembalikan JWT (rate-limit 5/15 menit) |
+| GET | `/verify-email?token=...` | Verifikasi email via link dari email |
+| POST | `/forgot-password` | Kirim link reset password ke email (rate-limit 3/15 menit) |
+| POST | `/reset-password` | Reset password pakai token dari email |
 
 ### Users (`/users`) — khusus `Super_Admin`
 | Method | Endpoint | Deskripsi |
@@ -138,7 +144,7 @@ Base URL: `/api/v1`
 | GET | `/buyer/my-orders` | Buyer | List order milik buyer yang login |
 | GET | `/supplier/my-orders` | Supplier | List order masuk ke supplier yang login |
 | GET | `/:id` | Auth (ownership) | Detail order by id |
-| POST | `/` | Buyer | Buat order (1 order = 1 supplier, validasi min_order) |
+| POST | `/` | Buyer | Buat order (1 order = 1 supplier, validasi min_order) + kirim email notifikasi |
 | PATCH | `/:id/status` | Admin, Super_Admin | Update status order (ikuti alur status) |
 | PATCH | `/:id/cancel` | Buyer | Batalkan order milik sendiri |
 | DELETE | `/:id` | Admin, Super_Admin | Hapus order permanen |
@@ -166,6 +172,13 @@ Alur status order: `Pending -> Confirmed -> Processing -> Shipped -> Completed`,
 - Autentikasi menggunakan JWT dikirim via header `Authorization: Bearer <token>`.
 - Middleware `authenticate` memverifikasi token dan melampirkan `req.user` (termasuk relasi `role`).
 - Middleware `authorize("RoleName", ...)` membatasi akses berdasarkan `req.user.role.name_role`, contoh: `Supplier`, `Admin`, `Super_Admin`.
+
+## Email & Verifikasi
+
+- Registrasi (`register-company` / `register-buyer`) otomatis mengirim email verifikasi; user memiliki flag `verified` (default `false`). Login tetap berhasil walau belum verifikasi, namun response menyertakan `data.verified: false` + peringatan.
+- Verifikasi dilakukan via `GET /verify-email?token=...` (token JWT bertipe `verify_email`). Reset password via `POST /forgot-password` lalu `POST /reset-password` (token bertipe `reset_password`, anti user-enumeration).
+- Pembuatan order memicu pengiriman email notifikasi ke buyer & supplier (`queueOrderEmails`).
+- Email dikirim melalui queue (tidak memblokir response). Konfigurasi via variabel `SMTP_*` di `.env`.
 
 
 ## Instalasi
@@ -201,6 +214,16 @@ JWT_SECRET=your_jwt_secret
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
+
+# Email (Nodemailer - Gmail example)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+EMAIL_FROM=Bumi Nusa <your_email@gmail.com>
+
+# Frontend URL (untuk link verifikasi/reset password)
+FRONTEND_URL=http://localhost:3000
 ```
 
 Jalankan migrasi Prisma:
