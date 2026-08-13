@@ -178,7 +178,16 @@ Alur status order: `Pending -> Confirmed -> Processing -> Shipped -> Completed`,
 - Registrasi (`register-company` / `register-buyer`) otomatis mengirim email verifikasi; user memiliki flag `verified` (default `false`). Login tetap berhasil walau belum verifikasi, namun response menyertakan `data.verified: false` + peringatan.
 - Verifikasi dilakukan via `GET /verify-email?token=...` (token JWT bertipe `verify_email`). Reset password via `POST /forgot-password` lalu `POST /reset-password` (token bertipe `reset_password`, anti user-enumeration).
 - Pembuatan order memicu pengiriman email notifikasi ke buyer & supplier (`queueOrderEmails`).
-- Email dikirim melalui queue (tidak memblokir response). Konfigurasi via variabel `SMTP_*` di `.env`.
+
+### Email Queue (`src/utils/emailQueue.js`)
+
+Email dikirim secara asinkron melalui queue in-memory (`enqueueEmailJob`) agar response API tidak terblokir pengiriman SMTP. Job diproses satu per satu oleh `processQueue` (single worker, tidak ada worker paralel).
+
+**Tipe job (`action`):** `verify` (email verifikasi), `reset` (reset password), `order-admin` (notif order ke admin), `order-buyer` (notif order ke buyer).
+
+**Retry:** tiap job gagal di-retry otomatis maksimal `MAX_ATTEMPTS = 3` dengan jeda `RETRY_DELAYS = [2s, 10s]`; setelah batas gagal, job dibuang (logged sebagai `Gagal kirim permanen`). Queue bersifat in-memory—jika proses restart sebelum job terkirim, email hilang (ponytail: ganti ke Redis/BullMQ bila butuh durability).
+
+**Env tambahan:** `MAIL_FROM` (sender), `ADMIN_EMAIL` (penerima notif order admin).
 
 
 ## Instalasi
@@ -218,9 +227,11 @@ CLOUDINARY_API_SECRET=your_api_secret
 # Email (Nodemailer - Gmail example)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_app_password
-EMAIL_FROM=Bumi Nusa <your_email@gmail.com>
+MAIL_FROM=your_email@gmail.com
+ADMIN_EMAIL=admin@buminusa.id
 
 # Frontend URL (untuk link verifikasi/reset password)
 FRONTEND_URL=http://localhost:3000
