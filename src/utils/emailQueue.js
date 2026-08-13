@@ -4,21 +4,13 @@ const RETRY_DELAYS = [2000, 10000];
 const queue = [];
 let isProcessing = false;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const { sendOrderNotification, sendVerificationEmail, sendResetPasswordEmail } = require("./mailer");
 
 const HANDLERS = {
     "order-admin": (job) => sendOrderNotification({ to: job.to, order: job.order, type: "admin" }),
     "order-buyer": (job) => sendOrderNotification({ to: job.to, order: job.order, type: "buyer" }),
     "verify": (job) => sendVerificationEmail({ to: job.to, verifyUrl: job.verifyUrl }),
     "reset": (job) => sendResetPasswordEmail({ to: job.to, resetUrl: job.resetUrl })
-};
-
-const loadHandlers = () => {
-    const { sendOrderNotification, sendVerificationEmail, sendResetPasswordEmail } = require("./mailer");
-    HANDLERS["order-admin"] = (job) => sendOrderNotification({ to: job.to, order: job.order, type: "admin" });
-    HANDLERS["order-buyer"] = (job) => sendOrderNotification({ to: job.to, order: job.order, type: "buyer" });
-    HANDLERS["verify"] = (job) => sendVerificationEmail({ to: job.to, verifyUrl: job.verifyUrl });
-    HANDLERS["reset"] = (job) => sendResetPasswordEmail({ to: job.to, resetUrl: job.resetUrl });
 };
 
 const processQueue = async () => {
@@ -29,7 +21,6 @@ const processQueue = async () => {
         const job = queue.shift();
 
         try {
-            loadHandlers();
             const handler = HANDLERS[job.action];
 
             if (!handler) {
@@ -39,12 +30,15 @@ const processQueue = async () => {
             await handler(job);
             console.log(`[MAILQUEUE] Email terkirim ke ${job.to}`);
         } catch (error) {
-            if (job.attempts < MAX_ATTEMPTS) {
+            if (job.attempts < MAX_ATTEMPTS - 1) {
                 job.attempts += 1;
-                const delay = RETRY_DELAYS[job.attempts - 2] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1];
-                console.warn(`[MAILQUEUE] Gagal kirim ke ${job.to} (percobaan ${job.attempts}/${MAX_ATTEMPTS}), retry dalam ${delay / 1000}s:`, error.message);
-                queue.push(job);
-                await sleep(delay);
+                const delay = RETRY_DELAYS[job.attempts - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1];
+                console.warn(`[MAILQUEUE] Gagal kirim ke ${job.to} (percobaan ${job.attempts + 1}/${MAX_ATTEMPTS}), retry dalam ${delay / 1000}s:`, error.message);
+
+                setTimeout(() => {
+                    queue.push(job);
+                    processQueue();
+                }, delay);
             } else {
                 console.error(`[MAILQUEUE] Gagal kirim permanen ke ${job.to}:`, error.message || error);
             }
