@@ -1,16 +1,22 @@
 const MAX_ATTEMPTS = 3;
-const RETRY_DELAYS = [2000, 10000];
+const RETRY_DELAYS = [1000, 3000];
 
 const queue = [];
 let isProcessing = false;
 
-const { sendOrderNotification, sendVerificationEmail, sendResetPasswordEmail } = require("./mailer");
+let mailer = null;
+const getMailer = () => {
+    if (!mailer) {
+        mailer = require("./mailer");
+    }
+    return mailer;
+};
 
 const HANDLERS = {
-    "order-admin": (job) => sendOrderNotification({ to: job.to, order: job.order, type: "admin" }),
-    "order-buyer": (job) => sendOrderNotification({ to: job.to, order: job.order, type: "buyer" }),
-    "verify": (job) => sendVerificationEmail({ to: job.to, verifyUrl: job.verifyUrl }),
-    "reset": (job) => sendResetPasswordEmail({ to: job.to, resetUrl: job.resetUrl })
+    "order-admin": (job) => getMailer().sendOrderNotification({ to: job.to, order: job.order, type: "admin" }),
+    "order-buyer": (job) => getMailer().sendOrderNotification({ to: job.to, order: job.order, type: "buyer" }),
+    "verify": (job) => getMailer().sendVerificationEmail({ to: job.to, verifyUrl: job.verifyUrl }),
+    "reset": (job) => getMailer().sendResetPasswordEmail({ to: job.to, resetUrl: job.resetUrl })
 };
 
 const processQueue = async () => {
