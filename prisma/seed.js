@@ -8,10 +8,10 @@ const ADMIN_ROLES = ["Super_Admin", "Admin"];
 const roleSeeds = ["Super_Admin", "Admin", "Supplier", "Buyer"];
 
 const userSeeds = [
-    { email: "superadmin@buminusa.com", role: "Super_Admin" },
-    { email: "admin@buminusa.com", role: "Admin" },
-    { email: "supplier@buminusa.com", role: "Supplier" },
-    { email: "buyer@buminusa.com", role: "Buyer" },
+    { email: "superadmin@gmail.com", role: "Super_Admin" },
+    { email: "admin@gmail.com", role: "Admin" },
+    { email: "supplier@gmail.com", role: "Supplier" },
+    { email: "buyer@gmail.com", role: "Buyer" },
 ];
 
 const supplierProfile = {
