@@ -149,11 +149,13 @@ Product rules: `price_min <= price_max`; `min_order >= 100`; slug auto-generated
 | Method | Path | Auth | Roles | Description |
 |--------|------|------|-------|-------------|
 | GET | `/` | 🔓 | - | List all |
-| GET | `/:id` | 🔓 | - | Get by ID |
-| GET | `/slug/:slug` | 🔓 | - | Get by slug |
-| POST | `/` | 🔐 | Super_Admin | Create |
-| PUT | `/:id` | 🔐 | Super_Admin | Update |
-| DELETE | `/:id` | 🔐 | Super_Admin | Delete |
+| GET | `/:id` | 🔓 | - | Get by ID (includes `image_url`) |
+| GET | `/slug/:slug` | 🔓 | - | Get by slug (includes `image_url`) |
+| POST | `/` | 🔐 | Super_Admin | Create **(foto wajib, multipart `image`, max 2MB, JPG/PNG)** |
+| PUT | `/:id` | 🔐 | Super_Admin | Update (opsional `image`; jika upload baru → foto lama dihapus dari Cloudinary) |
+| DELETE | `/:id` | 🔐 | Super_Admin | Delete (foto Cloudinary ikut dihapus) |
+
+Category rules: `image_url` required on create; slug auto-generated & unique; image stored in Cloudinary `categories/` folder.
 
 ### Users (`/api/v1/users`) — Super_Admin only
 | Method | Path | Auth | Roles | Description |

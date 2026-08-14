@@ -1,4 +1,11 @@
 const prisma = require("../config/prisma");
+const { cloudinary } = require("../config/cloudinary");
+
+const getPublicId = (url) => {
+  if (!url) return null;
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+  return match ? match[1] : null;
+};
 
 const generateSlug = (text) => {
   return text
@@ -144,6 +151,13 @@ const createCategory = async (req, res) => {
       });
     }
 
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Foto kategori wajib diupload",
+      });
+    }
+
     let baseSlug = slug || generateSlug(name_categories);
     let existingSlug = await prisma.categories.findFirst({ where: { slug: baseSlug } });
     while (existingSlug) {
@@ -155,6 +169,7 @@ const createCategory = async (req, res) => {
       data: {
         name_categories,
         slug: baseSlug,
+        image_url: req.file.path,
       },
     });
 
@@ -202,12 +217,22 @@ const updateCategory = async (req, res) => {
       });
     }
 
+    const data = {
+      ...(name_categories && { name_categories }),
+      ...(slug || name_categories ? { slug: newSlug } : {}),
+    };
+
+    if (req.file) {
+      const oldPublicId = getPublicId(existing.image_url);
+      if (oldPublicId) {
+        await cloudinary.uploader.destroy(oldPublicId);
+      }
+      data.image_url = req.file.path;
+    }
+
     const updated = await prisma.categories.update({
       where: { id: existing.id },
-      data: {
-        ...(name_categories && { name_categories }),
-        ...(slug || name_categories ? { slug: newSlug } : {}),
-      },
+      data,
     });
 
     return res.status(200).json({
@@ -236,6 +261,11 @@ const deleteCategory = async (req, res) => {
         success: false,
         message: "Category not found",
       });
+    }
+
+    const publicId = getPublicId(existing.image_url);
+    if (publicId) {
+      await cloudinary.uploader.destroy(publicId);
     }
 
     await prisma.categories.delete({

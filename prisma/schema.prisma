@@ -99,6 +99,7 @@ model Categories {
   id              Int      @id @default(autoincrement())
   name_categories String   @db.VarChar(255)
   slug            String?  @unique @db.VarChar(255)
+  image_url       String   @db.Text
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
