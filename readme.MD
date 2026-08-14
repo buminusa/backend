@@ -1,264 +1,242 @@
-# Bumi Nusa - Backend API
+# Bumi Nusa Backend
 
-Backend REST API untuk **Bumi Nusa**, platform B2B yang mempertemukan supplier (perusahaan) dengan buyer. Dibangun dengan Express.js dan Prisma ORM di atas PostgreSQL.
+Backend API untuk platform B2B Bumi Nusa — menghubungkan Supplier (perusahaan manufaktur/industri) dengan Buyer (pembeli korporat).
 
 ## Tech Stack
 
-- **Runtime:** Node.js + Express 4
-- **ORM:** Prisma 7 (`@prisma/adapter-pg`) dengan PostgreSQL
-- **Auth:** JWT (`jsonwebtoken`) + `bcryptjs`
-- **Upload:** Multer + Cloudinary (`multer-storage-cloudinary`)
-- **Email:** Nodemailer (verifikasi email, reset password, notifikasi order)
-- **Security:** Helmet, CORS, `express-rate-limit`, Compression
-- **Logging:** Morgan
-- **CI/CD:** GitHub Actions (notifikasi Telegram untuk push, pull request, dan release)
+- **Runtime**: Node.js 20+
+- **Framework**: Express.js
+- **Database**: PostgreSQL (via Prisma ORM + `@prisma/adapter-pg`)
+- **Auth**: JWT (stateless) + bcryptjs
+- **Email**: Nodemailer + custom in-memory queue (3 retry, exponential backoff)
+- **Storage**: Cloudinary (images/PDF via multer-storage-cloudinary)
+- **Rate Limiting**: express-rate-limit
+- **Security**: helmet, cors, compression
 
-## Struktur Proyek
+## Project Structure
 
 ```
-be_bumi_nusa/
-├── app.js                     # Entry point Express (middleware, routing, error handler)
-├── bin/www                    # HTTP server bootstrap
-├── prisma/
-│   ├── schema.prisma          # Skema database
-│   └── migrations/            # Riwayat migrasi
-├── prisma.config.ts           # Konfigurasi Prisma (path schema & migrations)
-├── src/
-  │   ├── config/
-  │   │   ├── database.js        # Koneksi pool `pg` (native)
-  │   │   ├── prisma.js          # Prisma Client (adapter-pg)
-  │   │   └── cloudinary.js      # Konfigurasi Cloudinary & multer storage
-  │   ├── controllers/
-  │   │   ├── authControllers.js
-  │   │   ├── usersControllers.js
-  │   │   ├── companyProfileConrtrollers.js
-  │   │   ├── buyerControllers.js
-  │   │   ├── productControllers.js
-  │   │   ├── categoriesControllers.js
-  │   │   └── orderControllers.js
-  │   ├── middlewares/
-  │   │   ├── authMiddleware.js  # `authenticate` & `authorize`
-  │   │   └── uploadMiddleware.js
-  │   ├── routes/
-  │   │   ├── index.js
-  │   │   ├── authRoutes.js
-  │   │   ├── usersRoutes.js
-  │   │   ├── companyProfileRoutes.js
-  │   │   ├── buyerRoutes.js
-  │   │   ├── productsRoutes.js
-  │   │   ├── categoriesRoutes.js
-  │   │   └── ordersRoutes.js
-  │   └── utils/
-│       ├── slug.js
-│       ├── generateNumberOrders.js
-│       ├── flowOders.js
-│       ├── tokenUtils.js    # generate/verify JWT untuk verifikasi & reset password
-│       └── mailer.js        # queue email via nodemailer
-├── views/                     # Jade views (default express-generator)
-└── .github/workflows/
-    └── telegram.yml           # Notifikasi Telegram tiap push/PR/release
+src/
+├── config/           # Prisma, Cloudinary, DB pool
+├── controllers/      # Request handlers per domain
+│   ├── authControllers.js        # Register, login, verify, reset password
+│   ├── orderControllers.js       # Order CRUD, status flow
+│   ├── productControllers.js     # Product CRUD (supplier only)
+│   ├── companyProfileConrtrollers.js  # NOTE: filename has typo "Conrtrollers"
+│   ├── buyerControllers.js
+│   ├── usersControllers.js       # Admin user management
+│   └── categoriesControllers.js
+├── middlewares/      # Auth (authenticate/authorize), upload error handling
+├── routes/           # Express routers
+├── utils/            # Helpers (token, slug, email queue, order flow, mailer)
+├── generated/        # Prisma client (gitignored)
+prisma/
+├── schema.prisma     # Database schema
+├── migrations/       # Migration history
+├── seed.js           # Demo data (Super_Admin, Admin, Supplier, Buyer)
 ```
 
-## Model Data (Prisma)
+## Roles & Permissions
 
-| Model | Deskripsi |
-|---|---|
-| `Role` | Daftar role (Super_Admin, Admin, Supplier, Buyer, dst) |
-| `Users` | Akun user, terhubung ke `Role`, `CompanyProfiles`, `BuyerProfiles`; punya flag `verified` |
-| `CompanyProfiles` | Profil supplier (nama perusahaan, NPWP, logo, status verifikasi) |
-| `BuyerProfiles` | Profil pembeli |
-| `Categories` | Kategori produk |
-| `Product` | Produk milik supplier (harga min/max, min_order, unit, HS code, views, slug) |
-| `ProductImages` | Gambar produk (relasi 1-N ke `Product`) |
-| `Orders` | Order dari buyer ke supplier, punya status (`Pending`, `Confirmed`, `Processing`, `Shipped`, `Completed`, `Cancelled`) |
-| `OrderItems` | Baris item dalam order (relasi N-1 ke `Orders` dan `Product`) |
+| Role | Description | Key Permissions |
+|------|-------------|-----------------|
+| `Super_Admin` | Platform owner | Full access, user/role management |
+| `Admin` | Platform operator | Orders, verification, users (read) |
+| `Supplier` | Perusahaan penjual | Products, company profile, incoming orders, status update |
+| `Buyer` | Pembeli korporat | Buyer profile, create orders, my orders |
+
+## Auth Flow
+
+1. **Register** (`POST /api/v1/auth/register-company|register-buyer`)
+   - Creates user + profile (company/buyer) in a transaction
+   - Sends verification email (queued, non-blocking)
+   - Returns `verified: false`
+
+2. **Verify Email** (`GET /api/v1/auth/verify-email?token=`)
+   - Validates JWT (purpose: `verify_email`, 24h expiry)
+   - Sets `user.verified = true`
+
+3. **Login** (`POST /api/v1/auth/login`)
+   - Validates credentials
+   - **Rejects if `verified: false`** (403)
+   - Returns JWT (1h expiry) with payload:
+     ```json
+     { "userId": 1, "email": "...", "roleId": 3, "role": "Supplier", "name": "...", "verified": true }
+     ```
+
+4. **Protected Routes** — Require `Authorization: Bearer <token>`
+   - `authenticate` verifies JWT, fetches fresh user from DB, re-checks `user.verified`, attaches `req.user`
+   - Role-based access via `authorize("Role1", "Role2")`
+   - `verify-email` & `reset-password` paths are public (email-link tokens carry their own purpose check)
+
+5. **Forgot/Reset Password**
+   - `POST /forgot-password` → sends reset link (30m expiry, 3/15min rate limit, anti-enumeration)
+   - `POST /reset-password` with token + newPassword (min 6 chars)
+
+## Order Status Flow
+
+```
+Pending → Confirmed → Processing → Shipped → Completed
+   │           │            │
+Cancelled  Cancelled    Cancelled
+```
+
+Role transitions enforced in `utils/flowOders.js`:
+- **Buyer**: Pending → Cancelled
+- **Supplier**: Pending → Confirmed/Cancelled, Confirmed → Processing/Cancelled, Processing → Shipped
+- **Admin/Super_Admin**: All transitions
+
+On order creation, an email notification is queued to **Admin** (`ADMIN_EMAIL`) and the **Buyer** (order confirmation).
 
 ## API Endpoints
 
-Base URL: `/api/v1`
+### Auth (`/api/v1/auth`)
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| POST | `/register-company` | 🔓 | - | Register supplier (multipart npwp/logo wired but optional in handler) |
+| POST | `/register-buyer` | 🔓 | - | Register buyer |
+| POST | `/login` | 🔓 | - | Login (rate limited 5/15min) |
+| GET | `/verify-email` | 🔓 | - | Verify email via token |
+| POST | `/forgot-password` | 🔓 | - | Request reset (rate limited 3/15min) |
+| POST | `/reset-password` | 🔓 | - | Reset with token |
+| POST | `/logout` | 🔐 | all | Logout (client-side token removal) |
+| GET | `/me` | 🔐 | all | Current user profile |
 
-### Auth (`/auth`)
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| POST | `/register-company` | Registrasi supplier (upload NPWP + logo) + kirim email verifikasi |
-| POST | `/register-buyer` | Registrasi buyer + kirim email verifikasi |
-| POST | `/login` | Login, mengembalikan JWT (rate-limit 5/15 menit) |
-| GET | `/verify-email?token=...` | Verifikasi email via link dari email |
-| POST | `/forgot-password` | Kirim link reset password ke email (rate-limit 3/15 menit) |
-| POST | `/reset-password` | Reset password pakai token dari email |
+### Company Profiles (`/api/v1/company-profiles`)
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| GET | `/` | 🔐 | Admin, Super_Admin | List all (paginated, filter status) |
+| GET | `/:id` | 🔐 | all | Get by userId |
+| PUT | `/:id` | 🔐 | Supplier | Update own profile (ownership check) |
+| PUT | `/:id/logo` | 🔐 | Supplier | Upload logo (Cloudinary) |
+| PATCH | `/:id/verification-status` | 🔐 | Admin, Super_Admin | Update verification |
 
-### Users (`/users`) — khusus `Super_Admin`
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| GET | `/` | List semua user |
-| GET | `/:id` | Detail user |
-| PUT | `/:id` | Update user |
-| DELETE | `/:id` | Hapus user |
-| PATCH | `/:id/role` | Assign role ke user |
-| GET | `/:id/products` | List produk milik user |
+### Buyers (`/api/v1/buyers`)
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| GET | `/` | 🔓 | - | List all (public) |
+| GET | `/:id` | 🔐 | all | Get profile |
+| PUT | `/:id` | 🔐 | Buyer | Update own profile |
 
-### Company Profiles (`/company-profiles`)
-| Method | Endpoint | Akses | Deskripsi |
-|---|---|---|---|
-| GET | `/` | Admin | List semua profil perusahaan |
-| GET | `/:id` | Auth | Detail profil perusahaan |
-| PUT | `/:id` | Supplier | Update profil perusahaan |
-| PUT | `/:id/logo` | Supplier | Update logo |
-| PATCH | `/:id/verification-status` | Admin | Update status verifikasi |
+### Products (`/api/v1/products`)
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| GET | `/` | 🔐 | all | List all (paginated, filter) |
+| GET | `/me` | 🔐 | Supplier | My products |
+| GET | `/slug/:slug` | 🔐 | all | Get by slug |
+| GET | `/popular` | 🔐 | all | Top by views (limit 12) |
+| GET | `/:id` | 🔐 | all | Get by ID (increments views) |
+| POST | `/` | 🔐 | Supplier, Super_Admin | Create (max 5 images; Super_Admin may set supplierId) |
+| PUT | `/:id` | 🔐 | Supplier | Update own |
+| DELETE | `/:id` | 🔐 | Supplier, Super_Admin | Delete own |
+| DELETE | `/images/:imageId` | 🔐 | Supplier | Delete product image |
 
-### Buyers (`/buyers`)
-| Method | Endpoint | Akses | Deskripsi |
-|---|---|---|---|
-| GET | `/` | Public | List semua profil buyer |
-| GET | `/:id` | Auth | Detail profil buyer |
-| PUT | `/:id` | Auth | Update profil buyer |
+Product rules: `price_min <= price_max`; `min_order >= 100`; slug auto-generated & unique.
 
-### Products (`/products`)
-| Method | Endpoint | Akses | Deskripsi |
-|---|---|---|---|
-| GET | `/` | Auth | List semua produk |
-| GET | `/popular` | Auth | List produk terpopuler (by views) |
-| GET | `/slug/:slug` | Auth | Detail produk by slug |
-| GET | `/:id` | Auth | Detail produk by id |
-| POST | `/` | Supplier | Tambah produk (upload max 5 gambar) |
-| PUT | `/:id` | Supplier | Update produk |
-| PATCH | `/:id/status` | Admin | Update status produk |
-| DELETE | `/:id` | Supplier, Super_Admin | Hapus produk |
-| DELETE | `/images/:imageId` | Supplier | Hapus gambar produk |
+### Orders (`/api/v1/orders`)
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| GET | `/` | 🔐 | Admin, Super_Admin | All orders |
+| GET | `/buyer/my-orders` | 🔐 | Buyer | My orders as buyer |
+| GET | `/supplier/my-orders` | 🔐 | Supplier | My orders as supplier |
+| GET | `/:id` | 🔐 | Buyer, Supplier, Admin, Super_Admin | Detail (ownership check) |
+| POST | `/` | 🔐 | Buyer | Create (single supplier, quantity >= product.min_order) |
+| PATCH | `/:id/status` | 🔐 | Supplier, Admin, Super_Admin | Update status (validated flow) |
+| PATCH | `/:id/cancel` | 🔐 | Buyer | Cancel own (Pending only) |
+| DELETE | `/:id` | 🔐 | Admin, Super_Admin | Hard delete (cascade order items) |
 
+### Categories (`/api/v1/categories`)
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| GET | `/` | 🔓 | - | List all |
+| GET | `/:id` | 🔓 | - | Get by ID |
+| GET | `/slug/:slug` | 🔓 | - | Get by slug |
+| POST | `/` | 🔐 | Super_Admin | Create |
+| PUT | `/:id` | 🔐 | Super_Admin | Update |
+| DELETE | `/:id` | 🔐 | Super_Admin | Delete |
 
-### Categories (`/categories`)
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| GET | `/` | List semua kategori |
-| GET | `/slug/:slug` | Detail kategori by slug |
-| GET | `/:id` | Detail kategori by id |
-| POST | `/` | Tambah kategori |
-| PUT | `/:id` | Update kategori |
-| DELETE | `/:id` | Hapus kategori |
+### Users (`/api/v1/users`) — Super_Admin only
+| Method | Path | Auth | Roles | Description |
+|--------|------|------|-------|-------------|
+| GET | `/` | 🔐 | Super_Admin | List all |
+| GET | `/:id` | 🔐 | Super_Admin | Get by ID |
+| PUT | `/:id` | 🔐 | Super_Admin | Update (email, role) |
+| DELETE | `/:id` | 🔐 | Super_Admin | Delete |
+| PATCH | `/:id/role` | 🔐 | Super_Admin | Assign role |
+| GET | `/:id/products` | 🔐 | Super_Admin | Products by user |
 
-### Orders (`/orders`)
-| Method | Endpoint | Akses | Deskripsi |
-|---|---|---|---|
-| GET | `/` | Admin, Super_Admin | List semua order (filter `status`, `buyerId`, `supplierId`, `search`, `page`, `limit`) |
-| GET | `/buyer/my-orders` | Buyer | List order milik buyer yang login |
-| GET | `/supplier/my-orders` | Supplier | List order masuk ke supplier yang login |
-| GET | `/:id` | Auth (ownership) | Detail order by id |
-| POST | `/` | Buyer | Buat order (1 order = 1 supplier, validasi min_order) + kirim email notifikasi |
-| PATCH | `/:id/status` | Admin, Super_Admin | Update status order (ikuti alur status) |
-| PATCH | `/:id/cancel` | Buyer | Batalkan order milik sendiri |
-| DELETE | `/:id` | Admin, Super_Admin | Hapus order permanen |
-
-Alur status order: `Pending -> Confirmed -> Processing -> Shipped -> Completed`, dengan `Cancelled` tersedia dari `Pending`/`Confirmed` (buyer hanya bisa cancel saat `Pending`).
-
-### Lainnya
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| GET | `/health` | Health check server |
-
-## Format Response
-
-```json
-{
-  "success": true,
-  "message": "...",
-  "data": {},
-  "meta": {}
-}
-```
-
-## Autentikasi & Otorisasi
-
-- Autentikasi menggunakan JWT dikirim via header `Authorization: Bearer <token>`.
-- Middleware `authenticate` memverifikasi token dan melampirkan `req.user` (termasuk relasi `role`).
-- Middleware `authorize("RoleName", ...)` membatasi akses berdasarkan `req.user.role.name_role`, contoh: `Supplier`, `Admin`, `Super_Admin`.
-
-## Email & Verifikasi
-
-- Registrasi (`register-company` / `register-buyer`) otomatis mengirim email verifikasi; user memiliki flag `verified` (default `false`). Login tetap berhasil walau belum verifikasi, namun response menyertakan `data.verified: false` + peringatan.
-- Verifikasi dilakukan via `GET /verify-email?token=...` (token JWT bertipe `verify_email`). Reset password via `POST /forgot-password` lalu `POST /reset-password` (token bertipe `reset_password`, anti user-enumeration).
-- Pembuatan order memicu pengiriman email notifikasi ke buyer & supplier (`queueOrderEmails`).
-
-### Email Queue (`src/utils/emailQueue.js`)
-
-Email dikirim secara asinkron melalui queue in-memory (`enqueueEmailJob`) agar response API tidak terblokir pengiriman SMTP. Job diproses satu per satu oleh `processQueue` (single worker, tidak ada worker paralel).
-
-**Tipe job (`action`):** `verify` (email verifikasi), `reset` (reset password), `order-admin` (notif order ke admin), `order-buyer` (notif order ke buyer).
-
-**Retry:** tiap job gagal di-retry otomatis maksimal `MAX_ATTEMPTS = 3` dengan jeda `RETRY_DELAYS = [2s, 10s]`; setelah batas gagal, job dibuang (logged sebagai `Gagal kirim permanen`). Queue bersifat in-memory—jika proses restart sebelum job terkirim, email hilang (ponytail: ganti ke Redis/BullMQ bila butuh durability).
-
-**Env tambahan:** `MAIL_FROM` (sender), `ADMIN_EMAIL` (penerima notif order admin).
-
-
-## Instalasi
-
-### Prasyarat
-- Node.js
-- PostgreSQL
-- Akun Cloudinary
-
-### Langkah
-
-```bash
-git clone https://github.com/buminusa/backend.git
-cd backend
-npm install
-```
-
-Buat file `.env` di root project:
+## Environment Variables
 
 ```env
-# Server
-PORT=3000
-NODE_ENV=development
-ALLOWED_ORIGINS=http://localhost:3000
-
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/bumi_nusa
+DATABASE_URL=postgresql://user:pass@host:5432/db
 
 # JWT
-JWT_SECRET=your_jwt_secret
+JWT_SECRET=your-secret-key
+
+# Frontend (for email links); comma-separated allowed for CORS origins
+FRONTEND_URL=https://your-frontend.com
+
+# Email (SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+MAIL_FROM="Bumi Nusa <noreply@buminusa.com>"
+ADMIN_EMAIL=admin@buminusa.com
 
 # Cloudinary
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_CLOUD_NAME=xxx
+CLOUDINARY_API_KEY=xxx
+CLOUDINARY_API_SECRET=xxx
 
-# Email (Nodemailer - Gmail example)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-MAIL_FROM=your_email@gmail.com
-ADMIN_EMAIL=admin@buminusa.id
-
-# Frontend URL (untuk link verifikasi/reset password)
-FRONTEND_URL=http://localhost:3000
+# App
+PORT=3000
+NODE_ENV=development
 ```
 
-Jalankan migrasi Prisma:
+## Development
 
 ```bash
-npx prisma migrate deploy
-npx prisma generate
-```
+# Install deps
+npm install
 
-## Menjalankan Aplikasi
+# Generate Prisma client
+npm run db:generate
 
-```bash
-# development (dengan nodemon)
+# Run migrations
+npm run db:migrate
+
+# Seed demo data
+npm run db:seed
+
+# Dev server (nodemon)
 npm run dev
 
-# production
+# Production start
 npm start
 ```
 
-Server berjalan di `http://localhost:3000` (atau sesuai `PORT`).
+## Demo Accounts (after `npm run db:seed`)
 
-## CI/CD
+| Email | Password | Role | Verified |
+|-------|----------|------|----------|
+| superadmin@buminusa.com | 12345678 | Super_Admin | ✅ |
+| admin@buminusa.com | 12345678 | Admin | ✅ |
+| supplier@buminusa.com | 12345678 | Supplier | ❌ (verify via email) |
+| buyer@buminusa.com | 12345678 | Buyer | ❌ (verify via email) |
 
-Workflow `.github/workflows/telegram.yml` mengirim notifikasi ke Telegram setiap ada event `push`, `pull_request`, dan `release`, dengan deduplikasi berdasarkan commit SHA. Memerlukan secrets berikut di repository:
+## Key Implementation Details
 
-- `TELEGRAM_TOKEN`
-- `TELEGRAM_CHAT_ID`
+- **Slug uniqueness**: Auto-generated from name via `utils/slug.js`; collision retry loop with `Date.now()` + random suffix. Company/category controllers have their own inline slug logic.
+- **Role creation**: Idempotent via `findFirst` + `create` with `P2002` retry (race-safe)
+- **Email queue** (`utils/emailQueue.js`): In-memory, 3 attempts with delays [1s, 3s], non-blocking
+- **File uploads**: Cloudinary via multer-storage-cloudinary — NPWP/logo 1MB (jpg/png/pdf for NPWP), product images 10MB (jpg/png, max 5)
+- **Rate limiting**: Global 100/15min + login 5/15min + forgot-password 3/15min
+- **Order number**: `ORD-YYYYMMDD-XXXX` generated in `utils/generateNumberOrders.js`
+- **Security**: Helmet, CORS, compression, input validation; passwords bcryptjs (10 rounds)
+
+## License
+
+Internal use only — Bumi Nusa.
