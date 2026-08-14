@@ -72,7 +72,7 @@ const getMyOrdersBuyer = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
 
         const buyerProfile = await prisma.buyerProfiles.findUnique({
-            where: { userId: req.user.id }
+            where: { userId: req.user.userId }
         });
 
         if (!buyerProfile) {
@@ -126,7 +126,7 @@ const getMyOrdersSupplier = async (req, res) => {
         const skip = (Number(page) - 1) * Number(limit);
 
         const companyProfile = await prisma.companyProfiles.findUnique({
-            where: { userId: req.user.id }
+            where: { userId: req.user.userId }
         });
 
         if (!companyProfile) {
@@ -193,7 +193,9 @@ const getOrderById = async (req, res) => {
         const roleName = req.user.role?.name_role;
 
         if (roleName === "Buyer") {
-            const buyerProfile = await prisma.buyerProfiles.findUnique({ where: { userId: req.user.id } });
+const buyerProfile = await prisma.buyerProfiles.findUnique({
+            where: { userId: req.user.userId }
+        });
             if (!buyerProfile || order.buyerId !== buyerProfile.id) {
                 return res.status(403).json({
                     success: false,
@@ -203,7 +205,7 @@ const getOrderById = async (req, res) => {
         }
 
         if (roleName === "Supplier") {
-            const companyProfile = await prisma.companyProfiles.findUnique({ where: { userId: req.user.id } });
+            const companyProfile = await prisma.companyProfiles.findUnique({ where: { userId: req.user.userId } });
             if (!companyProfile || order.supplierId !== companyProfile.id) {
                 return res.status(403).json({
                     success: false,
@@ -248,7 +250,7 @@ const createOrder = async (req, res) => {
         };
 
         const buyerProfile = await prisma.buyerProfiles.findUnique({
-            where: { userId: req.user.id }
+            where: { userId: req.user.userId }
         });
 
         if (!buyerProfile) {
@@ -368,7 +370,7 @@ const updateOrderStatus = async (req, res) => {
         const roleName = req.user.role?.name_role;
 
         if (roleName === "Supplier") {
-            const companyProfile = await prisma.companyProfiles.findUnique({ where: { userId: req.user.id } });
+            const companyProfile = await prisma.companyProfiles.findUnique({ where: { userId: req.user.userId } });
             if (!companyProfile || order.supplierId !== companyProfile.id) {
                 return res.status(403).json({
                     success: false,
@@ -414,7 +416,7 @@ const cancelOrder = async (req, res) => {
         const { id } = req.params;
 
         const buyerProfile = await prisma.buyerProfiles.findUnique({
-            where: { userId: req.user.id }
+            where: { userId: req.user.userId }
         });
 
         if (!buyerProfile) {

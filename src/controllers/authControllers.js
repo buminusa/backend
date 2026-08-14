@@ -43,19 +43,21 @@ const registerCompany = async (req, res) => {
         };
 
         // ambil role supplier
-        let roleExisting = await prisma.role.findFirst({
-            where: {
-                name_role: "Supplier"
-            }
-        });
-
-        if (!roleExisting) {
-            roleExisting = await prisma.role.create({
-                data: {
-                    name_role: "Supplier"
+        const roleExisting = await prisma.$transaction(async (tx) => {
+            let role = await tx.role.findFirst({ where: { name_role: "Supplier" } });
+            if (!role) {
+                try {
+                    role = await tx.role.create({ data: { name_role: "Supplier" } });
+                } catch (e) {
+                    if (e.code === "P2002") {
+                        role = await tx.role.findFirst({ where: { name_role: "Supplier" } });
+                    } else {
+                        throw e;
+                    }
                 }
-            });
-        }
+            }
+            return role;
+        });
 
         // hash password
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -67,12 +69,13 @@ const registerCompany = async (req, res) => {
             .trim()
             .replace(/\s+/g, "-");
 
-        // cek slug sudah ada atau belum, kalau ada tambahkan timestamp biar tetap unik
-        const existingSlug = await prisma.companyProfiles.findFirst({
-            where: { slug: baseSlug }
-        });
-
-        const finalSlug = existingSlug ? `${baseSlug}-${Date.now()}` : baseSlug;
+        // cek slug sudah ada atau belum, kalau ada tambahkan timestamp + random suffix biar tetap unik
+        let finalSlug = baseSlug;
+        let existingSlug = await prisma.companyProfiles.findFirst({ where: { slug: finalSlug } });
+        while (existingSlug) {
+            finalSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+            existingSlug = await prisma.companyProfiles.findFirst({ where: { slug: finalSlug } });
+        }
 
         // create user + company profile dalam satu transaksi
         const result = await prisma.$transaction(async (tx) => {
@@ -163,19 +166,21 @@ const registerBuyer = async (req, res) => {
 
 
         // ambil role buyer 
-        let roleExisting = await prisma.role.findFirst({
-            where: {
-                name_role: "Buyer"
-            }
-        })
-
-        if (!roleExisting) {
-            roleExisting = await prisma.role.create({
-                data: {
-                    name_role: "Buyer"
+        const roleExisting = await prisma.$transaction(async (tx) => {
+            let role = await tx.role.findFirst({ where: { name_role: "Buyer" } });
+            if (!role) {
+                try {
+                    role = await tx.role.create({ data: { name_role: "Buyer" } });
+                } catch (e) {
+                    if (e.code === "P2002") {
+                        role = await tx.role.findFirst({ where: { name_role: "Buyer" } });
+                    } else {
+                        throw e;
+                    }
                 }
-            });
-        }
+            }
+            return role;
+        });
 
         // hash password 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -245,7 +250,6 @@ const login = async (req, res) => {
             });
         }
 
-        // cek email
         const user = await prisma.users.findUnique({
             where: {
                 email: normalizedEmail
@@ -264,7 +268,6 @@ const login = async (req, res) => {
             });
         }
 
-        // cek password
         const isPasswordValid = await bcrypt.compare(password, user.password);
 
         if (!isPasswordValid) {
@@ -274,9 +277,15 @@ const login = async (req, res) => {
             });
         }
 
+        if (!user.verified) {
+            return res.status(403).json({
+                success: false,
+                message: "Email belum diverifikasi. Silakan verifikasi email Anda."
+            });
+        }
+
         const profileName = user.buyerProfiles?.full_name || user.companyProfiles?.company_name || user.email;
 
-        // generate token
         const token = jwt.sign(
             {
                 userId: user.id,
@@ -290,18 +299,6 @@ const login = async (req, res) => {
                 expiresIn: "1h"
             }
         );
-
-        if (!user.verified) {
-            return res.status(200).json({
-                success: true,
-                message: "Login berhasil, namun email belum diverifikasi",
-                token: token,
-                data: {
-                    verified: false,
-                    warning: "Email belum diverifikasi. Silakan verifikasi melalui email yang sudah dikirim ke Gmail Anda."
-                }
-            });
-        }
 
         return res.status(200).json({
             success: true,

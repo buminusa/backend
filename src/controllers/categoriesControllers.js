@@ -144,18 +144,17 @@ const createCategory = async (req, res) => {
       });
     }
 
-    const baseSlug = slug || generateSlug(name_categories);
-
-    const existingSlug = await prisma.categories.findFirst({
-      where: { slug: baseSlug },
-    });
-
-    const finalSlug = existingSlug ? `${baseSlug}-${Date.now()}` : baseSlug;
+    let baseSlug = slug || generateSlug(name_categories);
+    let existingSlug = await prisma.categories.findFirst({ where: { slug: baseSlug } });
+    while (existingSlug) {
+      baseSlug = `${slug || generateSlug(name_categories)}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      existingSlug = await prisma.categories.findFirst({ where: { slug: baseSlug } });
+    }
 
     const category = await prisma.categories.create({
       data: {
         name_categories,
-        slug: finalSlug,
+        slug: baseSlug,
       },
     });
 
@@ -189,22 +188,25 @@ const updateCategory = async (req, res) => {
       });
     }
 
-    const newSlug = slug || (name_categories ? generateSlug(name_categories) : existing.slug);
+    const baseSlug = slug || (name_categories ? generateSlug(name_categories) : existing.slug);
+    let newSlug = baseSlug;
 
-    const slugTaken = await prisma.categories.findFirst({
-      where: {
-        slug: newSlug,
-        NOT: { id: existing.id },
-      },
+    let slugTaken = await prisma.categories.findFirst({
+      where: { slug: newSlug, NOT: { id: existing.id } },
     });
 
-    const finalSlug = slugTaken ? `${newSlug}-${Date.now()}` : newSlug;
+    while (slugTaken) {
+      newSlug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      slugTaken = await prisma.categories.findFirst({
+        where: { slug: newSlug, NOT: { id: existing.id } },
+      });
+    }
 
     const updated = await prisma.categories.update({
       where: { id: existing.id },
       data: {
         ...(name_categories && { name_categories }),
-        ...(slug || name_categories ? { slug: finalSlug } : {}),
+        ...(slug || name_categories ? { slug: newSlug } : {}),
       },
     });
 

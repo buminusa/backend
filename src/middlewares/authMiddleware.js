@@ -1,9 +1,14 @@
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/prisma");
 
+const publicPaths = ["/verify-email", "/reset-password"];
+
 const authenticate = async (req, res, next) => {
   try {
-    // Get token from Authorization header
+    if (publicPaths.includes(req.path)) {
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -22,11 +27,9 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userIdFromToken = decoded.userId ?? decoded.id;
 
-    // Check if user still exists
     const user = await prisma.users.findUnique({
       where: { id: userIdFromToken },
       include: { role: true },
@@ -39,10 +42,15 @@ const authenticate = async (req, res, next) => {
       });
     }
 
-    // Attach user to request object
+    if (!user.verified) {
+      return res.status(403).json({
+        success: false,
+        message: "Email belum diverifikasi. Silakan verifikasi email Anda.",
+      });
+    }
+
     req.user = {
-      id: user.id,
-      name: user.name,
+      userId: user.id,
       email: user.email,
       roleId: user.roleId,
       role: user.role,

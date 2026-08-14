@@ -23,7 +23,7 @@ const getMyProducts = async (req, res) => {
     const { categoryId, search } = req.query;
 
     const companyProfile = await prisma.companyProfiles.findUnique({
-      where: { userId: req.user.id },
+      where: { userId: req.user.userId },
     });
 
     if (!companyProfile) {
@@ -318,7 +318,7 @@ const createProduct = async (req, res) => {
       }
     } else {
       const companyProfile = await prisma.companyProfiles.findUnique({
-        where: { userId: req.user.id },
+        where: { userId: req.user.userId },
       });
 
       if (!companyProfile) {
@@ -400,7 +400,7 @@ const updateProduct = async (req, res) => {
     } = req.body;
 
     const companyProfile = await prisma.companyProfiles.findUnique({
-      where: { userId: req.user.id },
+      where: { userId: req.user.userId },
     });
 
     if (!companyProfile) {
@@ -517,7 +517,7 @@ const deleteProduct = async (req, res) => {
 
     if (!isSuperAdmin) {
       const companyProfile = await prisma.companyProfiles.findUnique({
-        where: { userId: req.user.id },
+        where: { userId: req.user.userId },
       });
 
       if (!companyProfile) {
@@ -580,7 +580,7 @@ const deleteProductImage = async (req, res) => {
     const imageId = Number(req.params.imageId);
 
     const companyProfile = await prisma.companyProfiles.findUnique({
-      where: { userId: req.user.id },
+      where: { userId: req.user.userId },
     });
 
     if (!companyProfile) {

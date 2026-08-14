@@ -9,17 +9,16 @@ const generateSlug = (text) => {
 };
 
 const generateUniqueSlug = async (prismaModel, text, excludeId = null) => {
-  const rawSlug = generateSlug(text);
+  const baseSlug = generateSlug(text);
+  let slug = baseSlug;
 
-  const existing = await prismaModel.findUnique({
-    where: { slug: rawSlug },
-  });
-
-  if (!existing || (excludeId && existing.id === excludeId)) {
-    return rawSlug;
+  let existing = await prismaModel.findUnique({ where: { slug } });
+  while (existing && !(excludeId && existing.id === excludeId)) {
+    slug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    existing = await prismaModel.findUnique({ where: { slug } });
   }
 
-  return `${rawSlug}-${Date.now()}`;
+  return slug;
 };
 
 module.exports = { generateSlug, generateUniqueSlug };

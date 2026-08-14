@@ -2,8 +2,8 @@ const prisma = require("../config/prisma");
 
 const getBuyerProfile = async (req, res) => {
   try {
-    const { id } = req.params;
-    const userId = id ? parseInt(id) : req.user?.id;
+const { id } = req.params;
+  const userId = id ? parseInt(id) : req.user?.userId;
 
     if (!userId) {
       return res.status(400).json({
@@ -104,10 +104,19 @@ const getAllBuyerProfiles = async (req, res) => {
 const updateBuyerProfile = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = parseInt(id);
+
+    if (userId !== req.user.userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Tidak diizinkan mengubah profile buyer lain",
+      });
+    }
+
     const { full_name, address, province, country, phone } = req.body;
 
     const existing = await prisma.buyerProfiles.findUnique({
-      where: { userId: parseInt(id) },
+      where: { userId },
     });
 
     if (!existing) {
@@ -118,7 +127,7 @@ const updateBuyerProfile = async (req, res) => {
     }
 
     const updated = await prisma.buyerProfiles.update({
-      where: { userId: parseInt(id) },
+      where: { userId },
       data: {
         ...(full_name && { full_name }),
         ...(address && { address }),

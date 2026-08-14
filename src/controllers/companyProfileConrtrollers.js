@@ -42,7 +42,6 @@ const getCompanyProfile = async (req, res) => {
                         id: true,
                         nama: true,
                         slug: true,
-                        status: true,
                         createdAt: true
                     }
                 }
@@ -131,12 +130,20 @@ const getAllCompanyProfiles = async (req, res) => {
 // update company profile berdasarkan id user
 const updateCompanyProfile = async (req, res) => {
     try {
-
         const { id } = req.params;
+        const userId = parseInt(id);
+
+        if (userId !== req.user.userId) {
+            return res.status(403).json({
+                success: false,
+                message: "Tidak diizinkan mengubah profile company lain"
+            });
+        }
+
         const { company_name, address, province, country, phone, business_description } = req.body;
 
         const existing = await prisma.companyProfiles.findUnique({
-            where: { userId: parseInt(id) }
+            where: { userId }
         });
 
         if (!existing) {
@@ -155,15 +162,23 @@ const updateCompanyProfile = async (req, res) => {
                 .trim()
                 .replace(/\s+/g, "-");
 
-            const slugTaken = await prisma.companyProfiles.findFirst({
+            let slugTaken = await prisma.companyProfiles.findFirst({
                 where: { slug: baseSlug, NOT: { id: existing.id } }
             });
 
-            slug = slugTaken ? `${baseSlug}-${Date.now()}` : baseSlug;
+            slug = slugTaken ? `${baseSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` : baseSlug;
+            while (slugTaken) {
+                slugTaken = await prisma.companyProfiles.findFirst({
+                    where: { slug, NOT: { id: existing.id } }
+                });
+                if (slugTaken) {
+                    slug = `${baseSlug}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                }
+            }
         }
 
         const updated = await prisma.companyProfiles.update({
-            where: { userId: parseInt(id) },
+            where: { userId },
             data: {
                 ...(company_name && { company_name, slug }),
                 ...(address && { address }),
@@ -191,8 +206,16 @@ const updateCompanyProfile = async (req, res) => {
 // update logo berdasarkan id user
 const updateLogo = async (req, res) => {
     try {
-
         const { id } = req.params;
+        const userId = parseInt(id);
+
+        if (userId !== req.user.userId) {
+            return res.status(403).json({
+                success: false,
+                message: "Tidak diizinkan mengubah logo company lain"
+            });
+        }
+
         const logo = req.file?.path;
 
         if (!logo) {
@@ -203,7 +226,7 @@ const updateLogo = async (req, res) => {
         }
 
         const existing = await prisma.companyProfiles.findUnique({
-            where: { userId: parseInt(id) }
+            where: { userId }
         });
 
         if (!existing) {
@@ -214,7 +237,7 @@ const updateLogo = async (req, res) => {
         }
 
         const updated = await prisma.companyProfiles.update({
-            where: { userId: parseInt(id) },
+            where: { userId },
             data: { logo_url: logo },
             select: { id: true, company_name: true, logo_url: true, updatedAt: true }
         });
