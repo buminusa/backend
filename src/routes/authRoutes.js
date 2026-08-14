@@ -8,20 +8,20 @@ const { uploadRegister } = require("../config/cloudinary");
 
 // rate limiter khusus login: 5 percobaan per 15 menit per IP
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs: 5 * 60 * 1000,
     max: 5,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, message: "Terlalu banyak percobaan login. Coba lagi dalam 15 menit." }
+    message: { success: false, message: "Terlalu banyak percobaan login. Coba lagi dalam 5 menit." }
 });
 
 // rate limiter khusus forgot password: 3 percobaan per 15 menit per IP
 const forgotPasswordLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs: 5 * 60 * 1000,
     max: 3,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, message: "Terlalu banyak permintaan reset password. Coba lagi dalam 15 menit." }
+    message: { success: false, message: "Terlalu banyak permintaan reset password. Coba lagi dalam 5 menit." }
 });
 
 
