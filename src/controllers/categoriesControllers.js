@@ -26,6 +26,7 @@ const getAllCategories = async (req, res) => {
       ? {
           OR: [
             { name_categories: { contains: search, mode: "insensitive" } },
+            { name_categories_en: { contains: search, mode: "insensitive" } },
             { slug: { contains: search, mode: "insensitive" } },
           ],
         }
@@ -142,7 +143,7 @@ const getCategoryBySlug = async (req, res) => {
 
 const createCategory = async (req, res) => {
   try {
-    const { name_categories, slug } = req.body;
+    const { name_categories, name_categories_en, slug } = req.body;
 
     if (!name_categories) {
       return res.status(400).json({
@@ -168,6 +169,7 @@ const createCategory = async (req, res) => {
     const category = await prisma.categories.create({
       data: {
         name_categories,
+        name_categories_en: name_categories_en?.trim() || null,
         slug: baseSlug,
         image_url: req.file.path,
       },
@@ -190,7 +192,7 @@ const createCategory = async (req, res) => {
 
 const updateCategory = async (req, res) => {
   try {
-    const { name_categories, slug } = req.body;
+    const { name_categories, name_categories_en, slug } = req.body;
 
     const existing = await prisma.categories.findUnique({
       where: { id: parseInt(req.params.id) },
@@ -219,6 +221,9 @@ const updateCategory = async (req, res) => {
 
     const data = {
       ...(name_categories && { name_categories }),
+      ...(typeof name_categories_en === "string" && {
+        name_categories_en: name_categories_en.trim() || null,
+      }),
       ...(slug || name_categories ? { slug: newSlug } : {}),
     };
 
