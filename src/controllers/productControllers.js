@@ -348,7 +348,7 @@ const createProduct = async (req, res) => {
       },
     });
 
-    const imageFiles = req.files?.images || [];
+    const imageFiles = req.files || [];
 
     if (imageFiles.length > 0) {
       const createImages = imageFiles.map((file) => ({
@@ -475,7 +475,7 @@ const updateProduct = async (req, res) => {
       data,
     });
 
-    const imageFiles = req.files?.images || [];
+    const imageFiles = req.files || [];
     if (imageFiles.length > 0) {
       const createImages = imageFiles.map((file) => ({
         productId: updatedProduct.id,
