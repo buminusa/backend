@@ -26,7 +26,7 @@ router.post(
 router.put(
   "/:id",
   authenticate,
-  authorize("Supplier"),
+  authorize("Supplier", "Admin", "Super_Admin"),
   uploadProduct.array("images", 5),
   handleUploadError,
   productController.updateProduct

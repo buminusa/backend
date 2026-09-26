@@ -399,27 +399,9 @@ const updateProduct = async (req, res) => {
       categoryId,
     } = req.body;
 
-    const companyProfile = await prisma.companyProfiles.findUnique({
-      where: { userId: req.user.userId },
-    });
-
-    if (!companyProfile) {
-      return res.status(403).json({
-        success: false,
-        message: "Hanya supplier yang dapat memperbarui produk.",
-      });
-    }
-
-    // minimal order 100kg
-    if (min_order !== undefined && min_order !== null && min_order !== "" && Number(min_order) < 100) {
-      return res.status(400).json({
-        success: false,
-        message: "Minimal order harus lebih besar atau sama dengan 100kg.",
-      });
-    }
-
     const existingProduct = await prisma.product.findUnique({
       where: { id: productId },
+      include: { _count: { select: { images: true } } },
     });
 
     if (!existingProduct) {
@@ -429,10 +411,56 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    if (existingProduct.supplierId !== companyProfile.id) {
-      return res.status(403).json({
+    const roleName = req.user.role?.name_role;
+    const canManageAllProducts = roleName === "Admin" || roleName === "Super_Admin";
+
+    if (!canManageAllProducts) {
+      const companyProfile = await prisma.companyProfiles.findUnique({
+        where: { userId: req.user.userId },
+      });
+
+      if (!companyProfile) {
+        return res.status(403).json({
+          success: false,
+          message: "Hanya supplier yang dapat memperbarui produk.",
+        });
+      }
+
+      if (existingProduct.supplierId !== companyProfile.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Anda tidak memiliki izin untuk mengubah produk ini.",
+        });
+      }
+    }
+
+    if (
+      min_order !== undefined &&
+      min_order !== null &&
+      min_order !== "" &&
+      (!Number.isInteger(Number(min_order)) || Number(min_order) < 100)
+    ) {
+      return res.status(400).json({
         success: false,
-        message: "Anda tidak memiliki izin untuk mengubah produk ini.",
+        message: "Minimal order harus berupa bilangan bulat dan minimal 100kg.",
+      });
+    }
+
+    if (
+      categoryId !== undefined &&
+      categoryId !== "" &&
+      (!Number.isInteger(Number(categoryId)) || Number(categoryId) <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Kategori tidak valid.",
+      });
+    }
+
+    if (nama !== undefined && !String(nama).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Nama produk wajib diisi.",
       });
     }
 
@@ -440,7 +468,7 @@ const updateProduct = async (req, res) => {
     const nextPriceMin = price_min !== undefined ? Number(price_min) : Number(existingProduct.price_min);
     const nextPriceMax = price_max !== undefined ? Number(price_max) : Number(existingProduct.price_max);
 
-    if (isNaN(nextPriceMin) || isNaN(nextPriceMax)) {
+    if (!Number.isFinite(nextPriceMin) || !Number.isFinite(nextPriceMax)) {
       return res.status(400).json({
         success: false,
         message: "price_min dan price_max harus berupa angka.",
@@ -454,20 +482,39 @@ const updateProduct = async (req, res) => {
       });
     }
 
+    const imageFiles = req.files || [];
+    if (existingProduct._count.images + imageFiles.length > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Jumlah gambar produk maksimal 5.",
+      });
+    }
+
     const data = {
-      ...(nama ? { nama } : {}),
+      ...(nama !== undefined ? { nama: String(nama).trim() } : {}),
       ...(description !== undefined ? { description: description || null } : {}),
       ...(spectification !== undefined ? { spectification: spectification || null } : {}),
-      ...(min_order ? { min_order: Number(min_order) } : {}),
+      ...(min_order !== undefined ? { min_order: Number(min_order) } : {}),
       ...(price_min !== undefined ? { price_min: Number(price_min) } : {}),
       ...(price_max !== undefined ? { price_max: Number(price_max) } : {}),
       ...(unit !== undefined ? { unit: unit || null } : {}),
       ...(hs_code !== undefined ? { hs_code: hs_code || null } : {}),
-      ...(categoryId ? { category: { connect: { id: Number(categoryId) } } } : {}),
+      ...(categoryId !== undefined
+        ? {
+            category:
+              categoryId === ""
+                ? { disconnect: true }
+                : { connect: { id: Number(categoryId) } },
+          }
+        : {}),
     };
 
-    if (nama && nama !== existingProduct.nama) {
-      data.slug = await generateUniqueSlug(prisma.product, nama, existingProduct.id);
+    if (nama !== undefined && String(nama).trim() !== existingProduct.nama) {
+      data.slug = await generateUniqueSlug(
+        prisma.product,
+        String(nama).trim(),
+        existingProduct.id,
+      );
     }
 
     const updatedProduct = await prisma.product.update({
@@ -475,7 +522,6 @@ const updateProduct = async (req, res) => {
       data,
     });
 
-    const imageFiles = req.files || [];
     if (imageFiles.length > 0) {
       const createImages = imageFiles.map((file) => ({
         productId: updatedProduct.id,
