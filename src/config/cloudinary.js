@@ -1,6 +1,5 @@
 require("dotenv").config();
 const cloudinary = require("cloudinary").v2;
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const multer = require("multer");
 
 cloudinary.config({
@@ -8,6 +7,45 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+// Pengganti multer-storage-cloudinary (paket lama hanya mendukung cloudinary v1)
+class CloudinaryStorage {
+  constructor({ cloudinary, params }) {
+    this.cloudinary = cloudinary;
+    this.params = params;
+  }
+
+  _handleFile(req, file, cb) {
+    Promise.resolve(
+      typeof this.params === "function" ? this.params(req, file) : this.params
+    )
+      .then((options) => {
+        const uploadStream = this.cloudinary.uploader.upload_stream(
+          { resource_type: "auto", ...options },
+          (error, result) => {
+            if (error) return cb(error);
+            cb(null, {
+              path: result.secure_url,
+              filename: result.public_id,
+              size: result.bytes,
+            });
+          }
+        );
+        file.stream.on("error", cb);
+        file.stream.pipe(uploadStream);
+      })
+      .catch(cb);
+  }
+
+  _removeFile(req, file, cb) {
+    if (!file.filename) return cb(null);
+    this.cloudinary.uploader.destroy(
+      file.filename,
+      { resource_type: file.mimetype === "application/pdf" ? "image" : "image" },
+      () => cb(null)
+    );
+  }
+}
 
 const storageNpwp = new CloudinaryStorage({
   cloudinary,
@@ -105,15 +143,15 @@ const uploadRegister = multer({
           file.fieldname === "npwp"
             ? ["jpg", "jpeg", "png", "pdf"]
             : ["jpg", "jpeg", "png"],
-        transformation: [{ quality: "auto" }]
+        transformation: [{ quality: "auto" }],
       };
-    }
+    },
   }),
   limits: { fileSize: 1 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedNpwp = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
     const allowedLogo = ["image/jpeg", "image/png", "image/jpg"];
-    
+
     if (file.fieldname === "npwp" && !allowedNpwp.includes(file.mimetype)) {
       return cb(new Error("Format file NPWP tidak didukung. Gunakan JPG, PNG, atau PDF."));
     }
@@ -121,7 +159,7 @@ const uploadRegister = multer({
       return cb(new Error("Format file logo tidak didukung. Gunakan JPG atau PNG."));
     }
     cb(null, true);
-  }
+  },
 });
 
 module.exports = { cloudinary, uploadRegister, uploadNpwp, uploadLogo, uploadProduct, uploadCategory };

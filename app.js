@@ -32,10 +32,21 @@ if (process.env.NODE_ENV === 'production') {
 
 
 // SECURITY
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL?.split(',') || '*', 
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  origin(origin, cb) {
+    // tanpa Origin (curl, Postman, server-to-server) tetap diizinkan
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
